@@ -151,7 +151,7 @@ td.mieux { color: var(--verite); font-weight: 600; }
 td.moins { color: var(--fourreau); }
 
 /* outils */
-.outils { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
+.outils { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
 .outil { background: var(--papier-2); border-radius: 4px; padding: 18px 20px; display: grid; gap: 8px; align-content: start; }
 .outil p { font-size: .92rem; color: var(--encre-2); }
 pre { margin: 0; background: var(--asphalte); color: var(--asphalte-encre); padding: 16px 18px; border-radius: 4px; overflow-x: auto; font: .82rem/1.65 var(--f-mono); }
@@ -723,7 +723,7 @@ pixel vide → 0 sur les 4 canaux</div>
           <tr><td>ortho</td><td>pixel 0,004 m · bouchage 3 px</td><td>Point le plus haut par pixel ; trous comblés par plus proche voisin.</td></tr>
           <tr><td>tranchee</td><td>grille_sol 0,05 m · fenetre_sol 2 m · centile 60 · profondeur_min 0,15 m · marge 0,6 m</td><td>Sol = centile glissant sur une grille grossière ; tranchée = composantes en contrebas de plus de 0,5 m².</td></tr>
           <tr><td>retour3d</td><td>pas 0,02 m · lissage 9 · lissage_z 1 m · tolerance_surface 0,03 m · longueur_min 0,15 m</td><td>Squelette du masque, chemins entre extrémités, crête par coupe transversale, médiane puis moyenne glissante en Z ; ponctuels par composantes connexes, centroïde 3D.</td></tr>
-          <tr><td>raccordement</td><td>trou_observe 0,06 m · trou_libre 0,5 m · trou_max 4 m · angle_max 35° · pente_max 0,5 · portée tangente 0,3 m</td><td>Suppression des éperons, appariement glouton des extrémités par coût (distance, angle, pente, classe), pont d'Hermite 3D marqué <code>deduit</code>.</td></tr>
+          <tr><td>raccordement</td><td>trou_observe 0,06 m · trou_libre 0,5 m · trou_max 6 m · angle_max 35° · pente_max 0,5 · portée tangente 0,3 m</td><td>Suppression des éperons, appariement glouton des extrémités par coût (distance, angle, pente, classe), pont d'Hermite 3D marqué <code>deduit</code>.</td></tr>
           <tr><td>evaluer</td><td>tolerance_eval 0,05 m</td><td>Distance 3D aux lignes de vérité (médiane, 95<sup>e</sup> centile), part de longueur retrouvée, précision et rappel des ponctuels ; observé et déduit séparés.</td></tr>
         </tbody>
       </table>
@@ -766,11 +766,12 @@ pixel vide → 0 sur les 4 canaux</div>
   <div class="cadre">
     <div class="entete">
       <div class="etiquette">Outils</div>
-      <h2>Trois façons de s'en servir</h2>
+      <h2>Outils et documentation</h2>
     </div>
     <div class="outils">
       <div class="outil"><h3>Atelier</h3><p>Page web locale : charger un nuage, le faire tourner, lancer la détection et voir chaque étape dans son onglet (ortho, tranchée, détection 2D, nuage nettoyé, tracés, séparation des réseaux, raccordement, raccord aux ouvrages, résultat avec le réseau BT existant). Pour comprendre une erreur.</p></div>
       <div class="outil"><h3>Entraînement</h3><p>Choisir un dossier brut Enedis et la répartition entraînement / validation / test, régler les epochs et le bruit, suivre la perte et l'écart au tracé en direct, avec un bouton anti-veille.</p></div>
+      <div class="outil"><h3>Guide développeur</h3><p>Chaque étape en détail : fonction, algorithme, modèle, paramètres et code source, avec figures animées. <a href="developpeurs.html">docs/developpeurs.html</a></p></div>
       <div class="outil"><h3>Ligne de commande</h3><p>Dans un environnement Python (<code>~/.venvs/tranchee3d</code>) : importer, préparer, entraîner (MPS), prédire (CPU), évaluer, visualiser. Chaque commande écrit des fichiers ouvrables dans QGIS ou CloudCompare.</p></div>
     </div>
     <pre style="margin-top: 20px"><span class="c"># détection sur un chantier, puis comparaison au récolement</span>

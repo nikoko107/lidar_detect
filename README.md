@@ -77,6 +77,11 @@ tracé coûte d'autant plus cher. Réglages dans la configuration :
 
 [`docs/presentation.html`](docs/presentation.html) : présentation fonctionnelle et technique (à ouvrir dans un navigateur, fichier autonome). Contient des images des chantiers Enedis : à ne pas diffuser sans accord.
 
+## Guide développeur
+
+[`docs/developpeurs.html`](docs/developpeurs.html) (à ouvrir dans un navigateur) : chaque étape de la chaîne
+en détail, avec la fonction, l'algorithme ou le modèle, les paramètres et le code source.
+
 ## Entraînement
 
 Guide complet (préparation, interface web avec graphiques, paramètres, lecture des métriques) :
