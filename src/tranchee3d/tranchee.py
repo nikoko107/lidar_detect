@@ -8,7 +8,6 @@ from scipy import ndimage as ndi
 from skimage.transform import resize
 
 from .config import Config
-from .nuage import Nuage
 from .ortho import Rasters
 
 
@@ -17,34 +16,6 @@ class Tranchee:
     zone: np.ndarray               # (H, W) bool : tranchée + marge (zone d'intérêt)
     fond: np.ndarray               # (H, W) bool : tranchée seule
     hauteur_relative: np.ndarray   # (H, W) float32 : hauteur - sol (NaN si vide)
-
-
-def points_fond(nuage: Nuage, r: Rasters, t: Tranchee, cfg: Config) -> np.ndarray:
-    """Points du fond de fouille et des `hauteur_fond` au-dessus, seulement. Fond = Z minimal par cellule de
-    `grille_sol` (médiane 3x3 contre le bruit), minimum glissant sur `fenetre_fond` (une cellule de paroi prend
-    le fond voisin), pris dans la tranchée détectée et prolongé au plus proche au-delà ; hors zone d'intérêt, rien. Écartés : terrain
-    autour, parois hautes, lèvres de terre, surplombs, coffrets."""
-    f = max(1, int(round(cfg.grille_sol / r.pixel)))
-    lig, col = r.xy_vers_px(nuage.xyz[:, 0], nuage.xyz[:, 1])
-    H, W = (r.forme[0] - 1) // f + 1, (r.forme[1] - 1) // f + 1
-    lig, col = lig.clip(0, r.forme[0] - 1), col.clip(0, r.forme[1] - 1)
-    cellule = lig // f * W + col // f
-    fond = np.full(H * W, np.nan)
-    ordre = np.argsort(nuage.xyz[:, 2], kind="stable")[::-1]     # du plus haut au plus bas : le plus bas reste
-    fond[cellule[ordre]] = nuage.xyz[ordre, 2]
-    fond = fond.reshape(H, W)
-    dans = t.fond[::f, ::f]
-    if not dans.any():
-        raise ValueError("Pas de tranchée détectée : fond de fouille introuvable.")
-    dans = ndi.binary_erosion(dans) if ndi.binary_erosion(dans).any() else dans   # cellules de bord : à demi terrain
-    _, (il, ic) = ndi.distance_transform_edt(np.isnan(fond), return_indices=True)
-    fond = ndi.median_filter(fond[il, ic], size=3, mode="nearest")
-    taille = max(3, int(round(cfg.fenetre_fond / cfg.grille_sol)) | 1)
-    fond = ndi.minimum_filter(fond, size=taille, mode="nearest")
-    _, (il, ic) = ndi.distance_transform_edt(~dans, return_indices=True)
-    fond = fond[il, ic].reshape(-1)
-    # hors zone d'intérêt, un terrain plus bas que le fond (rue en pente) passerait le seuil
-    return (nuage.xyz[:, 2] <= fond[cellule] + cfg.hauteur_fond) & t.zone[lig, col]
 
 
 def detecter_tranchee(r: Rasters, cfg: Config) -> Tranchee:

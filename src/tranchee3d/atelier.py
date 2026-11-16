@@ -11,7 +11,6 @@ import json
 import threading
 import time
 import traceback
-from dataclasses import replace
 from pathlib import Path
 
 import numpy as np
@@ -20,7 +19,7 @@ from PIL import Image
 from .config import CLASSES, Config
 
 # ordre des onglets de la page ; à partir de "detection", un modèle ONNX est nécessaire
-ETAPES = ["nuage", "ortho", "tranchee", "fond", "ortho_fond", "detection", "nettoyage", "traces", "reseaux", "sous_masque", "ouvrages",
+ETAPES = ["nuage", "ortho", "tranchee", "detection", "nettoyage", "traces", "reseaux", "sous_masque", "ouvrages",
           "resultat"]
 AVEC_MODELE = ETAPES.index("detection")
 # couleur d'affichage des points par classe (index = classe), et rampe type viridis pour les rasters continus
@@ -28,7 +27,7 @@ COULEURS_CLASSES = np.array([(0, 0, 0), (55, 182, 255), (255, 77, 94), (255, 201
 RAMPE = np.array([(68, 1, 84), (59, 82, 139), (33, 145, 140), (94, 201, 98), (253, 231, 37)], float)
 LARGEUR_PNG_MAX = 8000          # les PNG d'étape sont réduits au-delà : la page n'a pas besoin de plus
 COULEUR_FOND_TRANCHEE = np.array([255, 140, 0])   # orange en surimpression sur le fond de tranchée
-GRIS_POINTS_CACHES = 200        # points écartés (sous la surface, ou loin du fond de fouille) affichés en gris
+GRIS_POINTS_CACHES = 200        # points écartés (sous la surface) affichés en gris
 
 
 # ---------------------------------------------------------------- écriture des fichiers d'étape
@@ -135,7 +134,7 @@ class Atelier:
         return str(self.televersements / nom)
 
     # ------------------------------------------------------------- exécution
-    def lancer(self, nuage: str, modele: str | None, ortho: str | None, hauteur_fond: float = 0.0) -> None:
+    def lancer(self, nuage: str, modele: str | None, ortho: str | None) -> None:
         """Démarre l'exécution dans un thread. Sans modèle, les étapes à partir de la détection sont
         marquées `sans_modele` et l'exécution s'arrête avant."""
         inventaire = self.liste()
@@ -143,8 +142,6 @@ class Atelier:
             raise ValueError("Nuage inconnu.")
         if modele and modele not in inventaire["modeles"]:
             raise ValueError("Modèle inconnu.")
-        if not 0 <= hauteur_fond <= 2:
-            raise ValueError("Hauteur au-dessus du fond de fouille : entre 0 et 200 cm.")
         with self.verrou:
             if self.etat["en_cours"]:
                 raise ValueError("Une exécution est déjà en cours.")
@@ -156,25 +153,24 @@ class Atelier:
             self.etat = {"execution": self.etat["execution"] + 1, "en_cours": True, "dossier": nom,
                          "etapes": {e: {"statut": "attente" if i < derniere else "sans_modele"}
                                     for i, e in enumerate(ETAPES)}, "infos": {}}
-        threading.Thread(target=self._executer, args=(Path(nuage), modele, ortho, dossier, hauteur_fond),
+        threading.Thread(target=self._executer, args=(Path(nuage), modele, ortho, dossier),
                          daemon=True).start()
 
-    def _executer(self, chemin_nuage: Path, modele, ortho, dossier: Path, hauteur_fond: float) -> None:
+    def _executer(self, chemin_nuage: Path, modele, ortho, dossier: Path) -> None:
         """Corps du thread : enchaîne les étapes, s'arrête à la première erreur (statut `erreur`)."""
         # imports ici : la chaîne (rasterio, onnxruntime, shapely…) n'est chargée qu'à la première exécution
         from .evaluation import evaluer
         from .export import ecrire_geojson, image_controle, vers_geojson
         from .inference import predire
-        from .nuage import Nuage, lire_nuage
+        from .nuage import lire_nuage
         from .ortho import appliquer_ortho_fournie, generer_rasters
         from .preparation import orthos_de
         from .raccordement import raccorder, raccorder_ouvrages
         from .reseau_existant import par_classe, reseau_existant
         from .retour3d import classer_points, extraire
-        from .tranchee import detecter_tranchee, points_fond, tenseur_entree
-        from .preparation import filtrer_fond
+        from .tranchee import detecter_tranchee, tenseur_entree
 
-        cfg, infos = replace(self.cfg, hauteur_fond=hauteur_fond), self.etat["infos"]
+        cfg, infos = self.cfg, self.etat["infos"]
         verite = chemin_nuage.parent / "verite.geojson"
         verite = verite if verite.exists() else None
         # ortho fournie à côté du nuage : prioritaire sur l'ortho générée, comme à la préparation
@@ -197,7 +193,7 @@ class Atelier:
         s = {}   # objets partagés entre étapes (nuage, rasters, tranchée, classes, tronçons…)
 
         def f_nuage():
-            s["complet"] = s["nuage"] = n = lire_nuage(chemin_nuage)
+            s["nuage"] = n = lire_nuage(chemin_nuage)
             s["centre"] = c = (n.xyz.min(axis=0) + n.xyz.max(axis=0)) / 2   # la page travaille centrée sur 0
             affiches = _points(dossier / "nuage.bin", n.xyz, n.rvb, c, self.max_points)
             infos["decalage"] = (n.origine + c).tolist()
@@ -222,27 +218,6 @@ class Atelier:
             _png(dossier / "fond.png", fond)
             _png(dossier / "hauteur_relative.png", _rampe(t.hauteur_relative, -1.2, 0.3))
             return f"zone d'intérêt {100 * t.zone.mean():.0f} %, fond de tranchée {100 * t.fond.mean():.0f} % de l'image"
-
-        def f_fond():
-            n = s["complet"]
-            garde = points_fond(n, s["r"], s["t"], cfg) if cfg.hauteur_fond > 0 else np.ones(len(n), bool)
-            _points(dossier / "fond_gardes.bin", n.xyz[garde], n.rvb[garde], s["centre"], self.max_points)
-            _points(dossier / "fond_ecartes.bin", n.xyz[~garde], np.full(((~garde).sum(), 3), GRIS_POINTS_CACHES, np.uint8),
-                    s["centre"], self.max_points)
-            if cfg.hauteur_fond <= 0:
-                return "désactivé (0 cm) : nuage entier"
-            s["nuage"], s["r"], s["t"] = filtrer_fond(n, s["r"], s["t"], orthos, cfg)
-            return (f"{garde.sum():,} points gardés ({garde.mean():.0%}) entre le fond de fouille et "
-                    f"{100 * cfg.hauteur_fond:.0f} cm au-dessus ; {(~garde).sum():,} écartés").replace(",", " ")
-
-        def f_ortho_fond():
-            # ortho vue par le modèle : fond de la vue 2D des étapes suivantes
-            r = s["r"]
-            _png(dossier / "ortho_fond.png", r.rvb)
-            _png(dossier / "hauteur_fond.png", _rampe(r.hauteur, *np.nanpercentile(r.hauteur, [1, 99])))
-            if cfg.hauteur_fond <= 0:
-                return "désactivé (0 cm) : la détection se fait sur l'ortho du nuage entier"
-            return f"{100 * np.isnan(r.hauteur).mean():.0f} % de pixels vides (hors fond de fouille)"
 
         def f_detection():
             s["classes"], s["confiance"] = c, p = predire(tenseur_entree(s["r"], s["t"]), s["t"].zone, modele, cfg)
@@ -289,7 +264,7 @@ class Atelier:
             if verite:
                 infos["evaluation"] = evaluer(dossier / "resultat.geojson", verite, cfg)
             obs = sum(t.longueur for t in s["raccordes"] if t.origine == "observe")
-            existant = reseau_existant(s["complet"], s["raccordes"], dossier, cfg)
+            existant = reseau_existant(n, s["raccordes"], dossier, cfg)
             if existant is None:
                 return f"{obs:.2f} m observés -> {dossier / 'resultat.geojson'} (réseau existant indisponible)"
             ecrire_geojson(dossier / "reseau_existant.geojson", existant)
@@ -297,7 +272,7 @@ class Atelier:
             nb = len(infos["reseau_existant"].get("raccord_probable", []))
             return f"{obs:.2f} m observés, {nb} raccord(s) probable(s) au réseau existant -> {dossier / 'resultat.geojson'}"
 
-        fonctions = [f_nuage, f_ortho, f_tranchee, f_fond, f_ortho_fond, f_detection, f_nettoyage, f_traces, f_reseaux, f_sous_masque,
+        fonctions = [f_nuage, f_ortho, f_tranchee, f_detection, f_nettoyage, f_traces, f_reseaux, f_sous_masque,
                      f_ouvrages, f_resultat]
         try:
             for nom, f in zip(ETAPES, fonctions):

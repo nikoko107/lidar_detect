@@ -73,8 +73,6 @@
   <button id="ouvrir">Charger un .laz…</button>
   <input type="file" id="fichier" accept=".las,.laz" hidden>
   <select id="modele" title="Modèle ONNX"></select>
-  <label title="0 = nuage entier ; 30 = ortho des seuls points à moins de 30 cm du fond de fouille (utiliser un modèle entraîné de même)">Fond de fouille
-    <input type="number" id="fond" min="0" max="200" step="5" value="0" style="width:4.5em"> cm</label>
   <button id="lancer" class="principal">Lancer la détection</button>
   <span id="statut"></span>
 </div>
@@ -108,35 +106,29 @@ const ONGLETS = {
   nuage:       { titre: '1. Nuage', court: 'Nuage', couches: { nuage: 1 },
                  aide: 'Nuage brut, sous-échantillonné pour l’affichage.' },
   ortho:       { titre: '2. Ortho', court: 'Ortho', images: [['ortho.png', 'Ortho RVB'], ['hauteur.png', 'Hauteur']],
-                 aide: 'Projection verticale : point le plus haut par pixel. Zones noires = pixels vides. Nuage entier : sert à détecter la tranchée.' },
+                 aide: 'Projection verticale : point le plus haut par pixel. Zones noires = pixels vides.' },
   tranchee:    { titre: '3. Tranchée', court: 'Tranchée', images: [['tranchee.png', 'Zone d’intérêt'], ['fond.png', 'Fond de tranchée'],
                                                 ['hauteur_relative.png', 'Hauteur / sol']],
                  aide: 'Zone d’intérêt = tranchée + marge (le reste est assombri). Hauteur relative : −1,2 m (violet) à +0,3 m (jaune).' },
-  fond:        { titre: '4. Fond de fouille', court: 'Fond', couches: { fond_gardes: 1, fond_ecartes: 1 },
-                 aide: 'Variante « fond de fouille » (champ en haut, en cm ; 0 = désactivée) : seuls les points entre le fond de fouille (pris dans la tranchée détectée) et la hauteur choisie au-dessus servent à l’ortho et à la détection. En gris : points écartés (terrain autour, parois hautes, lèvres de terre, coffrets).' },
-  ortho_fond:  { titre: '5. Ortho fond', court: 'Ortho fond', surFond: 1,
-                 images: [['ortho_fond.png', 'Ortho fond de fouille'], ['hauteur_fond.png', 'Hauteur']],
-                 aide: 'Ortho refaite avec les seuls points gardés à l’étape 4 : c’est elle que voit le modèle. Noir = aucun point gardé. À 0 cm, identique à l’onglet 2.' },
-  detection:   { titre: '6. Détection 2D', surFond: 1, court: 'Détection', images: [['detection.png', 'Classes'], ['confiance.png', 'Confiance']],
+  detection:   { titre: '4. Détection 2D', court: 'Détection', images: [['detection.png', 'Classes'], ['confiance.png', 'Confiance']],
                  legende: true, aide: 'Sortie du U-Net (ONNX, CPU). Confiance : 0,3 (violet) à 1 (jaune).' },
-  nettoyage:   { titre: '7. Nuage nettoyé', court: 'Nettoyé', couches: { gris: 1, classes: 1, caches: 0 }, legende: true,
+  nettoyage:   { titre: '5. Nuage nettoyé', court: 'Nettoyé', couches: { gris: 1, classes: 1, caches: 0 }, legende: true,
                  aide: 'Points du nuage sous les masques, en surface seulement. « Cachés » : sous un masque mais sous la surface vue du dessus, donc écartés.' },
-  traces:      { titre: '8. Dessins auto', court: 'Dessins', couches: { gris: 1, traces: 1, ponctuels: 1 },
+  traces:      { titre: '6. Dessins auto', court: 'Dessins', couches: { gris: 1, traces: 1, ponctuels: 1 },
                  aide: 'Tronçons bruts mesurés sur la ligne de crête, avant raccordement. Une couleur par tronçon : la fragmentation saute aux yeux.' },
-  reseaux:     { titre: '9. Séparation réseaux', court: 'Réseaux', couches: { gris: 1, reseaux: 1 },
+  reseaux:     { titre: '7. Séparation réseaux', court: 'Réseaux', couches: { gris: 1, reseaux: 1 },
                  aide: 'Après raccordement : une couleur par câble (id_cable). Tirets = tronçons déduits.' },
-  sous_masque: { titre: '10. Sous masque', court: 'Masque', couches: { gris: 1, observes: 1, deduits: 1 },
+  sous_masque: { titre: '8. Sous masque', court: 'Masque', couches: { gris: 1, observes: 1, deduits: 1 },
                  aide: 'Tronçons déduits (jaune, tirets) : interpolation entre deux extrémités, pas une mesure.' },
-  ouvrages:    { titre: '11. Raccord ouvrages', court: 'Ouvrages', couches: { gris: 1, observes: 1, deduits: 1, ponctuels: 1, ouvrages: 1 },
+  ouvrages:    { titre: '9. Raccord ouvrages', court: 'Ouvrages', couches: { gris: 1, observes: 1, deduits: 1, ponctuels: 1, ouvrages: 1 },
                  aide: 'Bouts de câble prolongés jusqu’à la boîte ou au coffret le plus proche (distance_ouvrage_max), dans la continuité du fourreau : orange, tirets. Tronçon déduit, pas une mesure.' },
-  resultat:    { titre: '12. Résultat', court: 'Résultat', couches: { nuage: 1, resultat: 1, ponctuels: 1, verite: 1, existant: 1, raccord: 1 }, legende: true,
+  resultat:    { titre: '10. Résultat', court: 'Résultat', couches: { nuage: 1, resultat: 1, ponctuels: 1, verite: 1, existant: 1, raccord: 1 }, legende: true,
                  aide: 'GeoJSON final. Vérité terrain en blanc si verite.geojson est à côté du nuage. Réseau BT existant (© Enedis, open data, Licence Ouverte 2.0 ; précis à 5-10 m) : souterrain violet, aérien cyan (8 m) ; raccord probable orange en tirets, poteau ajouté brun.' },
 };
 const LIBELLES = { nuage: 'Nuage RVB', gris: 'Nuage (gris)', classes: 'Points classés', caches: 'Points cachés écartés',
                    traces: 'Tronçons bruts', ponctuels: 'Boîtes et coffrets', reseaux: 'Câbles raccordés',
                    observes: 'Tronçons observés', deduits: 'Tronçons déduits', resultat: 'Résultat', verite: 'Vérité terrain', ouvrages: 'Prolongements vers ouvrages',
-                   existant: 'Réseau BT existant (open data)', raccord: 'Raccord probable',
-                   fond_gardes: 'Points gardés (près du fond)', fond_ecartes: 'Points écartés' };
+                   existant: 'Réseau BT existant (open data)', raccord: 'Raccord probable' };
 
 let etat = null, ongletActif = 'nuage', charge = {}, execution = -1;
 
@@ -229,10 +221,6 @@ const CHARGEURS = {
       for (const p of v.points) boule(p, 0xffffff, couches.verite, 0.06);
     }
   },
-  async fond() {
-    vider(couches.fond_gardes); vider(couches.fond_ecartes);
-    couches.fond_gardes.add(new THREE.Points(await chargerPoints('fond_gardes.bin'), matRvb));
-    couches.fond_ecartes.add(new THREE.Points(await chargerPoints('fond_ecartes.bin'), matGris));
   },
   async nettoyage() {
     vider(couches.classes); vider(couches.caches);
@@ -335,7 +323,7 @@ function afficherOnglet(nom) {
     ctl.innerHTML = `<h2>Image</h2><div class="boutons">${boutons}</div>
       <h2>Fondu sur l’ortho</h2><input type="range" id="fondu" min="0" max="1" step="0.05" value="1">
       <div class="note">Molette : zoom · glisser : déplacer · double-clic : recadrer</div>` + (o.legende ? legende(nom) : '');
-    $('img-fond').src = `/fichiers/${o.surFond ? 'ortho_fond.png' : 'ortho.png'}?e=` + execution;   // l'ortho vue par le modèle
+    $('img-fond').src = '/fichiers/ortho.png?e=' + execution;
     $('img-dessus').src = '/fichiers/' + choix + '?e=' + execution;
     $('img-dessus').style.opacity = 1;
     ctl.querySelectorAll('[data-img]').forEach(b => b.onclick = () => { imageChoisie[nom] = b.dataset.img; afficherOnglet(nom); });
@@ -399,7 +387,7 @@ async function suivre() {
 }
 $('lancer').onclick = async () => {
   const r = await fetch('/api/lancer', { method: 'POST', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ nuage: $('nuage').value, modele: $('modele').value, hauteur_fond: +$('fond').value / 100 }) });
+    body: JSON.stringify({ nuage: $('nuage').value, modele: $('modele').value }) });
   if (!r.ok) { $('statut').textContent = (await r.json()).erreur; return; }
   afficherOnglet('nuage');
 };

@@ -1,5 +1,0 @@
-# Variante « fond de fouille » : ortho et détection sur les seuls points à moins de 30 cm du fond de fouille.
-# Préparation : prepare_fond/ ; modèles : modeles/fond_v*. Même recette que final_v4 (reprise de final_v3).
-hauteur_fond = 0.30
-epochs = 15
-taux_apprentissage = 0.0003

@@ -335,6 +335,6 @@ def exporter_onnx(modele, chemin, cfg: Config):
     # prétraitement attendu par ces poids : l'inférence avertit si sa config diffère
     Path(chemin).with_suffix(".json").write_text(json.dumps(
         {"pixel": cfg.pixel, "tuile": cfg.tuile, "encodeur": cfg.encodeur, "classes": CLASSES,
-         "fenetre_sol": cfg.fenetre_sol, "centile_sol": cfg.centile_sol, "hauteur_fond": cfg.hauteur_fond},
+         "fenetre_sol": cfg.fenetre_sol, "centile_sol": cfg.centile_sol},
         indent=1), encoding="utf-8")
     return chemin

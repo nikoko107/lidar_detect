@@ -14,8 +14,8 @@ def predire(entree: np.ndarray, zone: np.ndarray, chemin_onnx, cfg: Config, lot=
 
     contrat = Path(chemin_onnx).with_suffix(".json")
     if contrat.exists():
-        attendu = {"hauteur_fond": 0.0, **json.loads(contrat.read_text(encoding="utf-8"))}   # anciens modèles : nuage entier
-        ecarts = {k: (attendu[k], getattr(cfg, k)) for k in ("pixel", "fenetre_sol", "centile_sol", "hauteur_fond")
+        attendu = json.loads(contrat.read_text(encoding="utf-8"))
+        ecarts = {k: (attendu[k], getattr(cfg, k)) for k in ("pixel", "fenetre_sol", "centile_sol")
                   if k in attendu and attendu[k] != getattr(cfg, k)}
         if ecarts:
             print(f"  attention : le modèle a été entraîné avec {ecarts} (valeur modèle, valeur actuelle) ; "

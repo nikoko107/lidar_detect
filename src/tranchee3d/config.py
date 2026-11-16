@@ -25,8 +25,6 @@ class Config:
     profondeur_min: float = 0.15    # profondeur minimale pour être « tranchée » (m)
     surface_min_tranchee: float = 0.5   # m²
     marge_tranchee: float = 0.6     # bande conservée autour (m), pour les coffrets
-    hauteur_fond: float = 0.0       # > 0 : ortho du seul nuage à moins de ça au-dessus du fond de fouille (m) ; 0 = nuage entier
-    fenetre_fond: float = 0.5       # minimum glissant (m) : le fond d'une cellule de paroi = fond voisin ; > largeur de paroi
 
     # --- Étiquettes (GeoJSON -> masques) ---
     ecart_fourreau: float = 0.05    # import RPD : câble à moins de cette distance d'un fourreau = sous fourreau (m)

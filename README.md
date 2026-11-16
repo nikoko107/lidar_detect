@@ -182,31 +182,6 @@ distance_raccord_max = 15.0    # m
 hauteur_aerien = 8.0           # m au-dessus du sol
 ```
 
-## Variante « fond de fouille » (en essai)
-
-Vu du dessus, les parois et lèvres de terre masquent les fourreaux qui les longent. La variante ne garde
-que le fond de fouille et les `hauteur_fond` au-dessus (`tranchee.points_fond`, `preparation.filtrer_fond`) :
-1. tranchée détectée sur le nuage entier, comme d'habitude ;
-2. fond = Z minimal par cellule de `grille_sol`, médiane 3×3, minimum glissant sur `fenetre_fond` (une
-   cellule de paroi prend le fond voisin), pris dans la tranchée et prolongé au plus proche au-delà ;
-3. gardés : points sous fond + `hauteur_fond` et dans la zone d'intérêt. Écartés : terrain autour, parois
-   hautes, lèvres de terre, coffrets (OSR31663028 : 24 % des points gardés) ;
-4. ortho et hauteur refaites sur la même grille avec ces points (pixels sans point noirs) ; la hauteur
-   relative garde le sol du nuage entier.
-Entraînement, détection et retour 3D se font sur le nuage filtré ; le visualiseur et le réseau existant
-gardent le nuage entier. `hauteur_fond = 0` (défaut) : méthode classique.
-
-```bash
-python -m tranchee3d --config fond.toml entrainer prepare_fond modeles/fond_v1 --bruts bruts --reprendre modeles/final_v3/meilleur.pt
-python -m tranchee3d --config fond.toml predire donnees/X/nuage.laz modeles/fond_v1/modele.onnx sortie/X_fond
-```
-
-Atelier : champ « Fond de fouille (cm) » à côté du modèle (0 = classique, 30 = variante, avec un modèle
-`fond_v*`), onglet « 4. Fond de fouille » après la tranchée (points gardés / écartés) ; dans l'onglet Ortho,
-« Ortho utilisée » devient l'ortho filtrée après cette étape, « Ortho nuage entier » permet de comparer. `modele.json` porte `hauteur_fond` : `predire` avertit si le modèle et la config diffèrent.
-Limites : les coffrets (hors sol) sont coupés ; sous une plaque sans point dessous, rien n'est gagné ; une
-zone du nuage aux couleurs étalées reste telle quelle.
-
 ## Licences
 
 | Élément | Licence | Remarque |

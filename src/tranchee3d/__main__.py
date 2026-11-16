@@ -57,7 +57,6 @@ def cmd_predire(a, cfg):
     """Nuage (+ ortho) -> GeoJSON 3D + visualiseur."""
     from .export import ecrire_geojson, image_controle, vers_geojson
     from .inference import predire
-    from .nuage import lire_nuage
     from .raccordement import raccorder, raccorder_ouvrages
     from .reseau_existant import reseau_existant
     from .retour3d import extraire
@@ -78,12 +77,11 @@ def cmd_predire(a, cfg):
     fc = vers_geojson(troncons, ponctuels, nuage.origine, nuage.crs)
     ecrire_geojson(sortie / "resultat.geojson", fc)
     image_controle(sortie / "controle_prediction.png", r.rvb, classes=classes, zone=t.zone)
-    complet = lire_nuage(a.nuage) if cfg.hauteur_fond > 0 else nuage    # affichage et sol : nuage entier
-    existant = reseau_existant(complet, troncons, sortie, cfg)
+    existant = reseau_existant(nuage, troncons, sortie, cfg)
     if existant is not None:
         ecrire_geojson(sortie / "reseau_existant.geojson", existant)
     verite = json.load(open(a.verite, encoding="utf-8")) if a.verite else None
-    construire(sortie / "visualiseur.html", complet, fc, verite, max_points=a.max_points,
+    construire(sortie / "visualiseur.html", nuage, fc, verite, max_points=a.max_points,
                titre=Path(a.nuage).parent.name or "Tranchée 3D", existant=existant)
 
     obs = sum(x.longueur for x in troncons if x.origine == "observe")

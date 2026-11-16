@@ -98,7 +98,7 @@ def _gestionnaire(atelier: Atelier, entrainements: Entrainements):
                     self._json({"chemin": atelier.televerser(unquote(self.headers.get("X-Nom", "")), self.rfile, taille)})
                 elif chemin == "/api/lancer":
                     d = self._corps_json()
-                    atelier.lancer(d["nuage"], d.get("modele") or None, d.get("ortho") or None, float(d.get("hauteur_fond") or 0))
+                    atelier.lancer(d["nuage"], d.get("modele") or None, d.get("ortho") or None)
                     self._json({"ok": True})
                 elif chemin == "/api/entrainement/lancer":
                     self._json({"nom": entrainements.lancer(self._corps_json())})

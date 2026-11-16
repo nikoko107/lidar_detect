@@ -16,7 +16,7 @@ from .config import Config
 REGLAGES_PREPARATION = [
     "pixel", "bouchage_px", "grille_sol", "fenetre_sol", "centile_sol", "profondeur_min", "surface_min_tranchee",
     "marge_tranchee", "ecart_fourreau", "champ_classe", "valeurs_classes", "tampon_cable_noir", "tampon_fourreau",
-    "rayon_boite", "rayon_coffret", "ecart_obstacle", "rouge_visible", "hauteur_fond", "fenetre_fond",
+    "rayon_boite", "rayon_coffret", "ecart_obstacle", "rouge_visible",
 ]
 EXTENSIONS_ORTHO = ("*.tif", "*.tiff", "*.jp2")
 
@@ -40,30 +40,9 @@ def rasters_et_tranchee(chemin_nuage, orthos, cfg: Config):
     for o in orthos:
         appliquer_ortho_fournie(r, o, nuage.origine)
     t = detecter_tranchee(r, cfg)
-    if cfg.hauteur_fond > 0:
-        nuage, r, t = filtrer_fond(nuage, r, t, orthos, cfg)
     part = 100 * t.zone.mean()
     print(f"  ortho {r.forme[1]} x {r.forme[0]} px ({r.source_ortho}), zone d'intérêt : {part:.0f} % de l'image")
     return nuage, r, t
-
-
-def filtrer_fond(nuage, r, t, orthos, cfg: Config):
-    """Variante fond de fouille : la tranchée (zone, sol) vient du nuage entier ; ortho et hauteur sont refaites
-    sur la même grille avec les seuls points du fond de fouille (pixels sans point : noirs)."""
-    from dataclasses import replace
-    from .nuage import Nuage
-    from .ortho import appliquer_ortho_fournie, generer_rasters
-    from .tranchee import points_fond
-
-    garde = points_fond(nuage, r, t, cfg)
-    print(f"  fond de fouille : {garde.mean():.0%} des points gardés (à moins de {cfg.hauteur_fond} m du fond)")
-    sol = r.hauteur - t.hauteur_relative
-    nuage = Nuage(nuage.xyz[garde], nuage.rvb[garde], nuage.origine, nuage.crs)
-    r = generer_rasters(nuage, cfg, cadre=r)
-    for o in orthos:
-        appliquer_ortho_fournie(r, o, nuage.origine)
-    r.rvb[np.isnan(r.hauteur)] = 0
-    return nuage, r, replace(t, hauteur_relative=(r.hauteur - sol).astype(np.float32))
 
 
 def preparer(chemin_nuage, chemin_geojson, sortie, orthos, cfg: Config) -> Path:

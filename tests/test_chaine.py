@@ -136,33 +136,3 @@ def test_fourreau_rouge_visible_garde_malgre_obstacle():
     masque[8:12] = 2
     _retirer_parties_cachees(masque, [(2, LineString([(0, 0.1, 0), (1, 0.1, 0)]), {})], r, np.zeros(3), CFG)
     assert (masque[8:12, :50] == 2).all() and (masque[8:12, 50:] == 0).all()
-
-
-def test_ortho_fond_de_fouille_montre_le_fourreau_sous_la_levre():
-    # tranchée de 40 cm à 0,5 m de profondeur ; fourreau rouge au pied de la paroi (x 0,12-0,18), sous une lèvre
-    # de terre grise en surplomb à -0,05 m (x 0-0,25) ; terrain naturel à 0 hors tranchée
-    from dataclasses import replace
-    from tranchee3d.preparation import filtrer_fond
-    from tranchee3d.tranchee import Tranchee, points_fond
-    g = np.mgrid[-1:1.4:0.01, 0:2:0.01].reshape(2, -1).T
-    dans = (g[:, 0] >= 0) & (g[:, 0] < 0.4)
-    sol = np.column_stack([g, np.where(dans, -0.5, 0.0)])
-    fourreau = sol[dans & (g[:, 0] >= 0.12) & (g[:, 0] < 0.18)] + [0, 0, 0.05]
-    levre = sol[dans & (g[:, 0] < 0.25)] * [1, 1, 0] + [0, 0, -0.05]
-    xyz = np.vstack([sol, fourreau, levre])
-    rvb = np.vstack([np.full((len(sol), 3), 120), np.tile([200, 30, 40], (len(fourreau), 1)),
-                     np.full((len(levre), 3), 90)]).astype(np.uint8)
-    n = Nuage(xyz, rvb, np.zeros(3))
-    cfg = replace(CFG, hauteur_fond=0.3)
-    r0 = generer_rasters(n, CFG)
-    x = r0.x0 + np.arange(r0.forme[1]) * r0.pixel
-    fond = np.broadcast_to((x >= 0) & (x < 0.4), r0.forme)
-    t = Tranchee(zone=fond.copy(), fond=fond.copy(), hauteur_relative=r0.hauteur.copy())
-    garde = points_fond(n, r0, t, cfg)
-    assert garde[len(sol):len(sol) + len(fourreau)].all() and not garde[-len(levre):].any()
-    assert garde[:len(sol)][dans].all() and not garde[:len(sol)][~dans].any()   # fond gardé, terrain autour écarté
-    _, r1, _ = filtrer_fond(n, r0, t, [], cfg)
-    lig, col = r0.xy_vers_px(np.array([0.15]), np.array([1.0]))
-    assert tuple(r0.rvb[lig[0], col[0]]) == (90, 90, 90) and tuple(r1.rvb[lig[0], col[0]]) == (200, 30, 40)
-    lig, col = r0.xy_vers_px(np.array([-0.5]), np.array([1.0]))
-    assert np.isnan(r1.hauteur[lig[0], col[0]])                         # terrain hors fond : pixel vide

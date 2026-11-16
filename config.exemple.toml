@@ -7,8 +7,6 @@ pixel = 0.004               # taille de pixel de l'ortho (m)
 fenetre_sol = 2.0           # doit dépasser deux fois la largeur de la tranchée (m)
 profondeur_min = 0.15       # m
 marge_tranchee = 0.6        # bande gardée autour, pour les coffrets (m)
-# hauteur_fond = 0.30       # variante « fond de fouille » : ortho des seuls points à moins de 30 cm du fond (0 = nuage entier)
-# fenetre_fond = 0.5        # minimum glissant : le fond sous une paroi = fond voisin
 
 # Étiquettes : nom de la propriété GeoJSON et valeurs associées aux classes
 champ_classe = "classe"

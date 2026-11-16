@@ -41,19 +41,15 @@ class Rasters:
         return from_origin(self.x0 + origine[0], self.y1 + origine[1], self.pixel, self.pixel)
 
 
-def generer_rasters(nuage: Nuage, cfg: Config, cadre: Rasters | None = None) -> Rasters:
-    """Projection verticale : le point le plus haut de chaque pixel l'emporte. `cadre` : reprendre sa grille."""
+def generer_rasters(nuage: Nuage, cfg: Config) -> Rasters:
+    """Projection verticale : le point le plus haut de chaque pixel l'emporte."""
     p = cfg.pixel
-    if cadre is not None:
-        H, W = cadre.forme
-        r = Rasters(np.zeros((H, W, 3), np.uint8), np.full((H, W), np.nan, np.float32), cadre.x0, cadre.y1, p)
-    else:
-        x0, y0 = nuage.xyz[:, :2].min(axis=0)
-        x1, y1 = nuage.xyz[:, :2].max(axis=0)
-        W = int(np.ceil((x1 - x0) / p)) + 1
-        H = int(np.ceil((y1 - y0) / p)) + 1
-        # bord haut = y0 + (H-1)p, pas y0 + Hp : sinon la ligne 0 est toujours vide et y0 tombe hors grille (ligne H)
-        r = Rasters(np.zeros((H, W, 3), np.uint8), np.full((H, W), np.nan, np.float32), x0, y0 + (H - 1) * p, p)
+    x0, y0 = nuage.xyz[:, :2].min(axis=0)
+    x1, y1 = nuage.xyz[:, :2].max(axis=0)
+    W = int(np.ceil((x1 - x0) / p)) + 1
+    H = int(np.ceil((y1 - y0) / p)) + 1
+    # bord haut = y0 + (H-1)p, pas y0 + Hp : sinon la ligne 0 est toujours vide et y0 tombe hors grille (ligne H)
+    r = Rasters(np.zeros((H, W, 3), np.uint8), np.full((H, W), np.nan, np.float32), x0, y0 + (H - 1) * p, p)
 
     lig, col = r.xy_vers_px(nuage.xyz[:, 0], nuage.xyz[:, 1])
     lig, col = lig.clip(0, H - 1), col.clip(0, W - 1)      # points posés pile sur le bord
