@@ -69,7 +69,7 @@ a { color: inherit; }
 .scene canvas:active { cursor: grabbing; }
 .scene .legende { position: absolute; left: 0; bottom: 0; display: flex; gap: 14px; flex-wrap: wrap; font: .75rem var(--f-mono); color: var(--asphalte-encre-2); }
 .cle { display: inline-flex; align-items: center; gap: 6px; }
-.cle i { width: 18px; height: 0; border-top: 3px solid #ff5a68; display: inline-block; }
+.cle i { width: 18px; height: 0; border-top: 3px solid #19d3ff; display: inline-block; }
 .cle i.deduit { border-top-style: dashed; }
 .cle i.verite { border-top: 2px solid var(--verite); }
 
@@ -231,9 +231,9 @@ table.libre td:last-child { color: var(--encre-2); font-size: .88rem; min-width:
       </div>
     </div>
     <div class="scene">
-      <canvas id="nuage" aria-label="Nuage de points du chantier OSR31662148 en rotation, avec le fourreau détecté tracé en rouge" role="img"></canvas>
+      <canvas id="nuage" aria-label="Nuage de points du chantier OSR31662148 en rotation, avec le fourreau détecté tracé en cyan" role="img"></canvas>
       <div class="legende">
-        <span class="cle"><i></i>fourreau observé</span>
+        <span class="cle"><i></i>fourreau détecté</span>
         <span class="cle"><i class="deduit"></i>déduit</span>
         <span>OSR31662148 · 60 000 points sur 3,4 M · glisser pour tourner</span>
       </div>
@@ -771,14 +771,15 @@ pixel vide → 0 sur les 4 canaux</div>
     <div class="outils">
       <div class="outil"><h3>Atelier</h3><p>Page web locale : charger un nuage, le faire tourner, lancer la détection et voir chaque étape dans son onglet (ortho, tranchée, détection 2D, nuage nettoyé, tracés, séparation des réseaux, raccordement, raccord aux ouvrages, résultat avec le réseau BT existant). Pour comprendre une erreur.</p></div>
       <div class="outil"><h3>Entraînement</h3><p>Choisir un dossier brut Enedis et la répartition entraînement / validation / test, régler les epochs et le bruit, suivre la perte et l'écart au tracé en direct, avec un bouton anti-veille.</p></div>
-      <div class="outil"><h3>Docker</h3><p>Une image avec le code, la documentation et les modèles. Les données restent sur la machine et sont montées au lancement. Inférence CPU, accessible sur le poste seulement.</p></div>
+      <div class="outil"><h3>Ligne de commande</h3><p>Dans un environnement Python (<code>~/.venvs/tranchee3d</code>) : importer, préparer, entraîner (MPS), prédire (CPU), évaluer, visualiser. Chaque commande écrit des fichiers ouvrables dans QGIS ou CloudCompare.</p></div>
     </div>
     <pre style="margin-top: 20px"><span class="c"># détection sur un chantier, puis comparaison au récolement</span>
 python -m tranchee3d predire donnees/X/nuage.laz modeles/final_v3/modele.onnx sortie/X
 python -m tranchee3d evaluer sortie/X/resultat.geojson donnees/X/verite.geojson
 
 <span class="c"># atelier et page d'entraînement : http://127.0.0.1:8765</span>
-python -m tranchee3d atelier            <span class="c"># ou : docker compose up -d</span></pre>
+source ~/.venvs/tranchee3d/bin/activate
+python -m tranchee3d atelier</pre>
   </div>
 </section>
 
@@ -1114,7 +1115,7 @@ courbe('g-fourreau', D.courbes.fourreau, 'var(--fourreau)', ' cm', 1);
     ctx.lineCap = ctx.lineJoin = 'round';
     for (const l of lignes) {
       const deduit = l.origine === 'deduit';
-      ctx.strokeStyle = '#ff4b5c'; ctx.lineWidth = Math.max(2, s / 18);
+      ctx.strokeStyle = '#19d3ff'; ctx.lineWidth = Math.max(2, s / 18);
       ctx.setLineDash(deduit ? [ctx.lineWidth * 2, ctx.lineWidth * 1.6] : []);
       ctx.beginPath();
       const n = Math.max(2, Math.round(l.pts.length * progres));
