@@ -221,7 +221,6 @@ const CHARGEURS = {
       for (const p of v.points) boule(p, 0xffffff, couches.verite, 0.06);
     }
   },
-  },
   async nettoyage() {
     vider(couches.classes); vider(couches.caches);
     couches.classes.add(new THREE.Points(await chargerPoints('classes.bin'), matClasses));
