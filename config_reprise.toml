@@ -1,0 +1,3 @@
+# Poursuite de l'entraînement depuis modeles/v1/meilleur.pt, avec bruit (valeurs par défaut de config.py)
+epochs = 20
+taux_apprentissage = 0.0003

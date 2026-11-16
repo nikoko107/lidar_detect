@@ -1,0 +1,51 @@
+# Copiez ce fichier et ne gardez que les lignes à modifier.
+# La liste complète et les valeurs par défaut sont dans src/tranchee3d/config.py.
+
+pixel = 0.004               # taille de pixel de l'ortho (m)
+
+# Tranchée
+fenetre_sol = 2.0           # doit dépasser deux fois la largeur de la tranchée (m)
+profondeur_min = 0.15       # m
+marge_tranchee = 0.6        # bande gardée autour, pour les coffrets (m)
+# hauteur_fond = 0.30       # variante « fond de fouille » : ortho des seuls points à moins de 30 cm du fond (0 = nuage entier)
+# fenetre_fond = 0.5        # minimum glissant : le fond sous une paroi = fond voisin
+
+# Étiquettes : nom de la propriété GeoJSON et valeurs associées aux classes
+champ_classe = "classe"
+tampon_cable_noir = 0.015   # demi-largeur du câble (m)
+tampon_fourreau = 0.03
+rayon_boite = 0.10          # à accorder à la taille réelle des boîtes
+rayon_coffret = 0.18
+ecart_obstacle = 0.10
+rouge_visible = [0.93, 0.05, 0.35, 0.25]   # pixel de fourreau rouge : étiquette gardée malgré ecart_obstacle
+
+# Modèle
+tuile = 384
+encodeur = "resnet18"
+poids_encodeur = "imagenet"
+epochs = 30
+poids_distance = 3.0        # pénalité sur l'écart au tracé d'entraînement (0 = désactivée)
+plafond_distance = 0.20     # m
+exposant_distance = 1.0
+critere = "distance"        # choix du meilleur modèle : "distance" ou "iou"
+
+# Retour en 3D
+pas = 0.02
+convention = "crete"        # "crete" ou "axe"
+
+# Raccordement
+trou_max = 6.0              # au-delà, on ne relie pas (m)
+trou_libre = 0.5            # en dessous, liaison sans contrôle d'angle ni de pente (m)
+angle_max = 35.0            # degrés
+distance_ouvrage_max = 2.0  # bout de câble prolongé jusqu'à une boîte / un coffret à moins de ça, en plan (m)
+
+# Réseau existant (open data Enedis) et raccord probable, étape « Résultat »
+reseau_existant = true
+distance_raccord_max = 15.0 # m, l'open data est précis à 5-10 m
+hauteur_aerien = 8.0        # m au-dessus du sol
+
+[valeurs_classes]
+cable_noir = 1
+fourreau_rouge = 2
+boite_jonction = 3
+coffret = 4

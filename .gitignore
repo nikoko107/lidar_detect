@@ -1,0 +1,25 @@
+# environnement Python (créé hors du disque FAT : ~/.venvs/tranchee3d)
+.venv/
+venv/
+.env
+__pycache__/
+*.egg-info/
+.pytest_cache/
+
+# données et résultats : jamais versionnés
+bruts/
+donnees/
+prepare/
+prepare_*/
+modeles/
+sortie/
+data/
+opendata_bt.geojson
+
+# fichiers de travail
+*.log
+processus.pid
+
+# macOS / disque FAT
+._*
+.DS_Store

@@ -1,0 +1,352 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Entraînement tranchée 3D</title>
+<style>
+  :root { color-scheme: dark;
+          --fond: #14171c; --surface: #1b1f26; --bord: #2c333d; --texte: #e6e8eb; --texte-2: #aab3bf;
+          --texte-3: #8d97a5; --grille: #2a3039; --accent: #2f6fde;
+          /* palette catégorielle validée (fond sombre) : la couleur suit la classe partout */
+          --s-cable_noir: #3987e5; --s-fourreau_rouge: #d95926; --s-coffret: #199e70; --s-boite_jonction: #c98500;
+          --s-perte: #3987e5; }
+  [hidden] { display: none !important; }
+  html, body { margin: 0; background: var(--fond); color: var(--texte);
+               font: 13px/1.45 -apple-system, "Segoe UI", Roboto, sans-serif; }
+  #barre { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; padding: 8px 16px;
+           background: var(--surface); border-bottom: 1px solid var(--bord); position: sticky; top: 0; z-index: 2; }
+  #barre h1 { font-size: 14px; margin: 0; font-weight: 600; }
+  #barre a { color: var(--texte-2); text-decoration: none; }
+  #barre a:hover { color: var(--texte); }
+  #statut { margin-left: auto; color: var(--texte-3); }
+  select, button, input { background: #2a313b; color: inherit; border: 1px solid #3a4350; border-radius: 5px;
+                          padding: 5px 8px; font: inherit; }
+  input[type=checkbox] { padding: 0; }
+  button { cursor: pointer; }
+  button:hover:not(:disabled) { background: #343d49; }
+  button:disabled { opacity: .5; cursor: default; }
+  button.principal { background: var(--accent); border-color: var(--accent); }
+  button.danger { border-color: #8a3a42; }
+  main { display: grid; grid-template-columns: minmax(280px, 340px) 1fr; gap: 16px; padding: 16px; }
+  @media (max-width: 900px) { main { grid-template-columns: 1fr; } }
+  .carte { background: var(--surface); border: 1px solid var(--bord); border-radius: 8px; padding: 14px; }
+  h2 { font-size: 11px; margin: 0 0 8px; color: var(--texte-3); font-weight: 600; text-transform: uppercase;
+       letter-spacing: .05em; }
+  h2:not(:first-child) { margin-top: 16px; }
+  .champ { display: grid; grid-template-columns: 1fr 96px; gap: 6px; align-items: center; padding: 3px 0; }
+  .champ input, .champ select { width: 100%; box-sizing: border-box; }
+  .champ small { grid-column: 1 / -1; color: var(--texte-3); margin-top: -3px; }
+  .cases { display: grid; grid-template-columns: 1fr 1fr; gap: 2px 8px; }
+  .cases label { display: flex; gap: 6px; align-items: center; cursor: pointer; }
+  .boutons { display: flex; gap: 8px; margin-top: 14px; }
+  .erreur { color: #ff8a95; margin-top: 8px; }
+  #droite { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+  #tuiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; }
+  .tuile .valeur { font-size: 24px; font-weight: 600; font-variant-numeric: tabular-nums; }
+  .tuile .detail { color: var(--texte-3); font-size: 12px; }
+  .barre-prog { height: 4px; background: var(--grille); border-radius: 2px; margin-top: 8px; overflow: hidden; }
+  .barre-prog div { height: 100%; background: var(--accent); width: 0; transition: width .4s; }
+  #graphiques { display: grid; grid-template-columns: repeat(auto-fit, minmax(380px, 1fr)); gap: 16px; }
+  .graphique { position: relative; }
+  .graphique svg { display: block; width: 100%; height: 240px; overflow: visible; }
+  .legende { display: flex; gap: 14px; flex-wrap: wrap; margin-bottom: 6px; color: var(--texte-2); font-size: 12px; }
+  .legende span { display: flex; align-items: center; gap: 6px; }
+  .legende i { width: 14px; height: 2px; border-radius: 1px; display: inline-block; }
+  .axe text { fill: var(--texte-3); font-size: 11px; font-variant-numeric: tabular-nums; }
+  .axe line { stroke: var(--grille); }
+  .etiquette { fill: var(--texte-2); font-size: 11px; }
+  .bulle { position: absolute; pointer-events: none; background: #0e1014; border: 1px solid var(--bord);
+           border-radius: 6px; padding: 6px 9px; font-size: 12px; white-space: nowrap; z-index: 1;
+           font-variant-numeric: tabular-nums; }
+  .bulle b { font-weight: 600; }
+  .bulle .ligne { display: flex; gap: 8px; align-items: center; justify-content: space-between; }
+  .bulle i { width: 8px; height: 8px; border-radius: 50%; display: inline-block; margin-right: 4px; }
+  .vide { color: var(--texte-3); padding: 40px 0; text-align: center; }
+  table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; font-size: 12px; }
+  th, td { padding: 4px 8px; text-align: right; border-bottom: 1px solid var(--grille); }
+  th { color: var(--texte-3); font-weight: 500; position: sticky; top: 0; background: var(--surface); }
+  td:first-child, th:first-child { text-align: left; }
+  tr.retenu td { color: #fff; font-weight: 600; }
+  .defile { max-height: 320px; overflow: auto; }
+  pre { margin: 0; font-size: 11px; color: var(--texte-2); white-space: pre-wrap; max-height: 220px; overflow: auto; }
+</style>
+</head>
+<body>
+<div id="barre">
+  <h1>Entraînement</h1>
+  <a href="/">← Atelier</a>
+  <select id="run" title="Entraînement affiché"></select>
+  <span id="statut"></span>
+  <button id="cafeine" title="Empêche la mise en veille du Mac tant que l'entraînement tourne (caffeinate)">☕ Anti-veille : désactivé</button>
+</div>
+<main>
+  <section class="carte" id="formulaire">
+    <h2>Nouvel entraînement</h2>
+    <div class="champ"><label for="nom">Nom</label><input id="nom" placeholder="auto"></div>
+    <small style="color:var(--texte-3)">Dossier modeles/&lt;nom&gt;/ (poids, ONNX, historique)</small>
+    <h2>Données</h2>
+    <div class="champ"><label for="dossier">Dossier</label><select id="dossier"></select></div>
+    <small style="color:var(--texte-3)">Brut : dossier Enedis (&lt;chantier&gt;/nuage/*.laz + recolement/), importé et préparé
+      au lancement (une seule fois, tant que rien ne change). L'ortho fournie dans &lt;chantier&gt;/ortho/ est utilisée si elle existe.</small>
+    <h2>Répartition (par chantier)</h2>
+    <div class="champ"><label>Entraînement</label><input id="pct-train" disabled></div>
+    <div class="champ"><label for="pct-val">Validation (%)</label><input id="pct-val" type="number" min="0" max="100" value="15"></div>
+    <small>Choisit l'epoch gardée. 0 % : la dernière epoch est gardée.</small>
+    <div class="champ"><label for="pct-test">Test (%)</label><input id="pct-test" type="number" min="0" max="100" value="15"></div>
+    <small>Mesuré une seule fois, à la fin : chantiers jamais vus.</small>
+    <div class="champ"><label for="graine">Graine du tirage</label><input id="graine" type="number" min="0" step="1" value="0"></div>
+    <small style="color:var(--texte-3)" id="apercu"></small>
+    <h2>Partir de</h2>
+    <select id="reprendre" style="width:100%"></select>
+    <h2>Paramètres</h2>
+    <div id="parametres"></div>
+    <div class="boutons">
+      <button id="lancer" class="principal">Lancer l'entraînement</button>
+      <button id="arreter" class="danger">Arrêter</button>
+    </div>
+    <div class="erreur" id="erreur"></div>
+  </section>
+  <section id="droite">
+    <div id="tuiles"></div>
+    <div id="graphiques"></div>
+    <div class="carte">
+      <h2>Toutes les epochs</h2>
+      <div class="defile"><table id="tableau"></table></div>
+    </div>
+    <div class="carte"><h2>Journal</h2><pre id="journal"></pre></div>
+  </section>
+</main>
+<script>
+const $ = id => document.getElementById(id);
+const NOMS = { cable_noir: 'Câble noir', fourreau_rouge: 'Fourreau rouge', boite_jonction: 'Boîte de jonction', coffret: 'Coffret' };
+const ORDRE = ['cable_noir', 'fourreau_rouge', 'coffret', 'boite_jonction'];
+const couleur = cle => getComputedStyle(document.documentElement).getPropertyValue('--s-' + cle).trim();
+const AIDE = {
+  epochs: ['Epochs', 'Nombre de passes ; une validation à la fin de chacune.'],
+  iterations_par_epoch: ['Lots par epoch', ''],
+  lot: ['Tuiles par lot', 'Plus grand = plus de mémoire GPU.'],
+  taux_apprentissage: ['Taux d’apprentissage', 'Maximum du cycle (OneCycle). Reprise : ~0,0003.'],
+  tuile: ['Tuile (px)', 'Côté des tuiles. 384 px ≈ 1,5 m à 4 mm.'],
+  encodeur: ['Encodeur', 'Une reprise exige le même encodeur.'],
+  part_tuiles_objet: ['Part tuiles sur objet', '0 à 1 : tuiles centrées sur un câble ou un ponctuel.'],
+  poids_distance: ['Poids perte de distance', '0 = désactivée.'],
+  critere: ['Critère du meilleur', 'distance = écart moyen au tracé ; iou.'],
+  bruit_rvb: ['Bruit couleurs', 'Écart-type (0 à 1).'],
+  bruit_hauteur: ['Bruit hauteur (m)', 'Écart-type sur la hauteur relative.'],
+  decalage_hauteur: ['Décalage du sol (m)', 'Erreur aléatoire ± sur le sol estimé.'],
+  echelle: ['Échelle ±', 'Part : 0,15 = ±15 %.'],
+  proba_trou: ['Probabilité de trou', 'Par tuile : pixels vides non étiquetés.'],
+  taille_trou: ['Taille max du trou', 'Part du côté de la tuile.'],
+  teinte_fourreau: ['Variation de teinte du fourreau', '± part du cercle des couleurs (0,03 ≈ ±11° : rouge → orangé ou rosé). 0 : désactivé.'],
+  saturation_fourreau: ['Variation de saturation du fourreau', '± relative (0,25 : rouge vif à rouge délavé). 0 : désactivé.'],
+};
+const fmt = (v, d = 2) => v == null || Number.isNaN(v) ? '–' : v.toLocaleString('fr-FR', { minimumFractionDigits: d, maximumFractionDigits: d });
+const duree = s => s < 90 ? `${Math.round(s)} s` : s < 5400 ? `${Math.round(s / 60)} min` : `${(s / 3600).toFixed(1)} h`;
+
+// ---------------------------------------------------------------- formulaire
+async function options() {
+  const o = await (await fetch('/api/entrainement/options')).json();
+  $('dossier').innerHTML = o.dossiers.map(d =>
+    `<option value="${d.chemin}">${d.chemin} · ${d.type === 'brut' ? 'brut' : 'préparé'} (${d.chantiers})</option>`).join('');
+  if (o.dossier_defaut) $('dossier').value = o.dossier_defaut;
+  apercu();
+  $('reprendre').innerHTML = '<option value="">Zéro (poids ImageNet)</option>' +
+    o.poids.map(p => `<option value="${p}">${p}</option>`).join('');
+  $('parametres').innerHTML = o.parametres.map(p => {
+    const [libelle, aide] = AIDE[p.nom] ?? [p.nom, ''];
+    const champ = p.choix
+      ? `<select data-p="${p.nom}">${p.choix.map(c => `<option ${c === p.defaut ? 'selected' : ''}>${c}</option>`).join('')}</select>`
+      : `<input data-p="${p.nom}" type="number" min="0" step="any" value="${p.defaut}">`;
+    return `<div class="champ"><label>${libelle}</label>${champ}${aide ? `<small>${aide}</small>` : ''}</div>`;
+  }).join('');
+}
+// aperçu calculé par le serveur (même tirage que le lancement) : nombres de chantiers seulement
+async function apercu() {
+  const v = +$('pct-val').value || 0, t = +$('pct-test').value || 0;
+  $('pct-train').value = Math.max(0, 100 - v - t) + ' %';
+  const q = new URLSearchParams({ dossier: $('dossier').value, validation: v, test: t, graine: $('graine').value || 0 });
+  const r = await fetch('/api/entrainement/repartition?' + q);
+  const d = await r.json();
+  $('lancer').disabled = !r.ok || !!enCours;
+  $('apercu').style.color = r.ok ? 'var(--texte-3)' : '#ff8a95';
+  $('apercu').textContent = !r.ok ? d.erreur :
+    `${d.train.length + d.validation.length + d.test.length} chantiers → ${d.train.length} entraînement · ` +
+    `${d.validation.length} validation · ${d.test.length} test` + (d.validation.length ? '' : ' (dernière epoch gardée)');
+}
+['dossier', 'pct-val', 'pct-test', 'graine'].forEach(id => $(id).addEventListener('input', apercu));
+$('lancer').onclick = async () => {
+  $('erreur').textContent = '';
+  const parametres = {};
+  document.querySelectorAll('[data-p]').forEach(e => { parametres[e.dataset.p] = e.type === 'number' ? +e.value : e.value; });
+  const corps = { nom: $('nom').value.trim(), reprendre: $('reprendre').value, parametres, dossier: $('dossier').value,
+                  pct_validation: +$('pct-val').value || 0, pct_test: +$('pct-test').value || 0, graine: +$('graine').value || 0 };
+  const r = await fetch('/api/entrainement/lancer', { method: 'POST', body: JSON.stringify(corps) });
+  const d = await r.json();
+  if (!r.ok) { $('erreur').textContent = d.erreur; return; }
+  runAffiche = d.nom;
+  await liste();
+};
+let cafeine = false;
+$('cafeine').onclick = async () => {
+  const r = await fetch('/api/entrainement/cafeine', { method: 'POST', body: JSON.stringify({ actif: !cafeine }) });
+  const d = await r.json();
+  if (!r.ok) { $('erreur').textContent = d.erreur; return; }
+  await liste();
+};
+$('arreter').onclick = () =>fetch('/api/entrainement/arreter', { method: 'POST' });
+
+// ---------------------------------------------------------------- graphiques SVG (une seule échelle par graphique)
+function graphique({ titre, series, unite, decimales, meilleur, epochs }) {
+  const carte = document.createElement('div');
+  carte.className = 'carte graphique';
+  const visibles = series.filter(s => s.points.length);
+  const legende = visibles.length > 1
+    ? `<div class="legende">${visibles.map(s => `<span><i style="background:${s.couleur}"></i>${s.nom}</span>`).join('')}</div>` : '';
+  carte.innerHTML = `<h2>${titre}</h2>${legende}`;
+  if (!visibles.length) { carte.insertAdjacentHTML('beforeend', '<div class="vide">Pas encore de mesure.</div>'); return carte; }
+  const L = 640, H = 240, m = { g: 44, d: 92, h: 10, b: 26 };
+  const tous = visibles.flatMap(s => s.points.map(p => p[1]));
+  let ymin = Math.min(0, ...tous), ymax = Math.max(...tous);
+  if (ymax === ymin) ymax = ymin + 1;
+  const pasY = graduation((ymax - ymin) / 4);
+  ymin = Math.floor(ymin / pasY) * pasY; ymax = Math.ceil(ymax / pasY) * pasY;
+  const xmax = Math.max(epochs || 1, ...visibles.flatMap(s => s.points.map(p => p[0])));
+  const X = e => m.g + (e - 1) / Math.max(xmax - 1, 1) * (L - m.g - m.d);
+  const Y = v => m.h + (1 - (v - ymin) / (ymax - ymin)) * (H - m.h - m.b);
+  let svg = `<svg viewBox="0 0 ${L} ${H}" preserveAspectRatio="none" role="img" aria-label="${titre}"><g class="axe">`;
+  for (let v = ymin; v <= ymax + pasY / 2; v += pasY)
+    svg += `<line x1="${m.g}" x2="${L - m.d}" y1="${Y(v)}" y2="${Y(v)}"/><text x="${m.g - 6}" y="${Y(v) + 4}" text-anchor="end">${fmt(v, decimales)}</text>`;
+  const pasX = Math.max(1, graduation(xmax / 6));
+  for (let e = 1; e <= xmax; e += (e === 1 && pasX > 1 ? pasX - 1 : pasX))
+    svg += `<text x="${X(e)}" y="${H - 6}" text-anchor="middle">${e}</text>`;
+  svg += '</g>';
+  if (meilleur) svg += `<line x1="${X(meilleur)}" x2="${X(meilleur)}" y1="${m.h}" y2="${H - m.b}" stroke="#e6e8eb" stroke-opacity=".5" stroke-dasharray="3 3"/>
+    <text class="etiquette" x="${X(meilleur) + 4}" y="${m.h + 10}">retenu</text>`;
+  // étiquettes directes en bout de ligne, écartées pour ne pas se chevaucher
+  const fins = visibles.map(s => ({ s, y: Y(s.points.at(-1)[1]) })).sort((a, b) => a.y - b.y);
+  for (let i = 1; i < fins.length; i++) fins[i].y = Math.max(fins[i].y, fins[i - 1].y + 13);
+  for (const { s, y } of fins) {
+    const d = s.points.map((p, i) => `${i ? 'L' : 'M'}${X(p[0]).toFixed(1)},${Y(p[1]).toFixed(1)}`).join('');
+    svg += `<path d="${d}" fill="none" stroke="${s.couleur}" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" vector-effect="non-scaling-stroke"/>`;
+    if (visibles.length > 1) svg += `<text class="etiquette" x="${L - m.d + 6}" y="${y + 4}">${s.nom}</text>`;
+  }
+  svg += `<line class="curseur" y1="${m.h}" y2="${H - m.b}" stroke="#e6e8eb" stroke-opacity=".35" visibility="hidden"/>
+    <g class="marques"></g><rect x="${m.g}" y="0" width="${L - m.g - m.d}" height="${H}" fill="transparent"/></svg>`;
+  carte.insertAdjacentHTML('beforeend', svg);
+  // survol : réticule + bulle avec toutes les séries à l'epoch la plus proche
+  const el = carte.querySelector('svg'), curseur = el.querySelector('.curseur'), marques = el.querySelector('.marques');
+  const bulle = document.createElement('div');
+  bulle.className = 'bulle'; bulle.hidden = true;
+  carte.append(bulle);
+  el.addEventListener('pointermove', ev => {
+    const b = el.getBoundingClientRect(), x = (ev.clientX - b.left) / b.width * L;
+    const e = Math.min(xmax, Math.max(1, Math.round(1 + (x - m.g) / (L - m.g - m.d) * Math.max(xmax - 1, 1))));
+    const valeurs = visibles.map(s => [s, s.points.find(p => p[0] === e)]).filter(([, p]) => p);
+    if (!valeurs.length) return;
+    curseur.setAttribute('x1', X(e)); curseur.setAttribute('x2', X(e)); curseur.setAttribute('visibility', 'visible');
+    marques.innerHTML = valeurs.map(([s, p]) =>
+      `<circle cx="${X(e)}" cy="${Y(p[1])}" r="4" fill="${s.couleur}" stroke="#1b1f26" stroke-width="2" vector-effect="non-scaling-stroke"/>`).join('');
+    bulle.innerHTML = `<b>Epoch ${e}${e === meilleur ? ' · retenu' : ''}</b>` + valeurs.map(([s, p]) =>
+      `<div class="ligne"><span><i style="background:${s.couleur}"></i>${s.nom}</span><span>${fmt(p[1], decimales)}${unite}</span></div>`).join('');
+    bulle.hidden = false;
+    const px = X(e) / L * b.width + el.offsetLeft;
+    bulle.style.left = (px + 12 + bulle.offsetWidth > carte.clientWidth ? px - bulle.offsetWidth - 12 : px + 12) + 'px';
+    bulle.style.top = (el.offsetTop + 8) + 'px';
+  });
+  el.addEventListener('pointerleave', () => { bulle.hidden = true; curseur.setAttribute('visibility', 'hidden'); marques.innerHTML = ''; });
+  return carte;
+}
+function graduation(brut) {
+  const p = 10 ** Math.floor(Math.log10(brut || 1)), r = brut / p;
+  return (r <= 1 ? 1 : r <= 2 ? 2 : r <= 5 ? 5 : 10) * p;
+}
+
+// ---------------------------------------------------------------- suivi
+let runAffiche = null, signature = '', enCours = null;
+function tuile(titre, valeur, detail, progression) {
+  return `<div class="carte tuile"><h2>${titre}</h2><div class="valeur">${valeur}</div><div class="detail">${detail}</div>` +
+    (progression != null ? `<div class="barre-prog"><div style="width:${100 * progression}%"></div></div>` : '') + '</div>';
+}
+function afficher(s) {
+  const debut = s.lignes.find(l => l.type === 'debut'), fin = s.lignes.find(l => l.type === 'fin');
+  const ep = s.lignes.filter(l => l.type === 'epoch');
+  const total = debut?.parametres.epochs ?? ep.at(-1)?.epochs ?? 0;
+  const derniere = ep.at(-1);
+  const retenu = fin?.epoch ?? ep.filter(l => l.retenu).at(-1)?.epoch;
+  const meilleure = ep.find(l => l.epoch === retenu);
+  const moy = ep.length ? ep.reduce((a, l) => a + l.duree, 0) / ep.length : 0;
+  if (!debut && s.en_cours) {   // phase d'import et de préparation, avant la première epoch
+    $('tuiles').innerHTML = tuile('Progression', 'Préparation', 'import et préparation des chantiers (voir le journal)', 0);
+    $('graphiques').innerHTML = ''; $('tableau').innerHTML = ''; $('journal').textContent = s.journal.join('\n');
+    return;
+  }
+  const etat = s.en_cours ? 'en cours' : fin ? 'terminé' : s.code_retour != null ? `arrêté (code ${s.code_retour})` : 'interrompu';
+  $('tuiles').innerHTML =
+    tuile('Progression', `${ep.length} / ${total}`, etat + (debut ? ` · ${debut.peripherique}` : ''), total ? ep.length / total : 0) +
+    (debut && !debut.validation.length
+      ? tuile('Mode', 'Tous les chantiers', 'sans validation · dernière epoch gardée')
+      : tuile('Meilleur écart moyen', meilleure?.ecart_moyen != null ? fmt(100 * meilleure.ecart_moyen) + ' cm' : '–',
+              meilleure ? `epoch ${retenu} · IoU ${fmt(meilleure.iou_moyen, 3)}` : 'critère : ' + (debut?.parametres.critere ?? ''))) +
+    tuile('Fourreau rouge', meilleure?.ecart.fourreau_rouge != null ? fmt(100 * meilleure.ecart.fourreau_rouge) + ' cm' : '–',
+          'écart au tracé à l’epoch retenue') +
+    tuile('Temps', moy ? duree(moy) + ' / epoch' : '–',
+          s.en_cours && moy ? `fin dans ~${duree(moy * (total - ep.length))}` : '') +
+    tuile('Test (jamais vus)', fin?.test?.ecart_moyen != null ? fmt(100 * fin.test.ecart_moyen) + ' cm' : '–',
+          fin?.test ? `fourreau ${fmt(100 * fin.test.ecart.fourreau_rouge)} cm · IoU ${fmt(fin.test.iou_moyen, 3)}`
+                    : debut?.test?.length ? 'mesuré à la fin' : 'aucun chantier de test') +
+    (debut ? tuile('Répartition', `${debut.train.length} · ${debut.validation.length} · ${debut.test?.length ?? 0}`,
+                   'entraînement · validation · test') : '');
+
+  const classes = ORDRE.filter(c => ep.some(l => l.ecart[c] != null || l.iou[c] != null));
+  const serie = (cle, f) => ({ nom: NOMS[cle] ?? cle, couleur: couleur(cle), points: ep.filter(l => f(l) != null).map(l => [l.epoch, f(l)]) });
+  const g = $('graphiques');
+  g.innerHTML = '';
+  g.append(
+    graphique({ titre: 'Perte d’entraînement', unite: '', decimales: 2, meilleur: retenu, epochs: total,
+                series: [{ nom: 'Perte', couleur: couleur('perte'), points: ep.map(l => [l.epoch, l.perte]) }] }),
+    graphique({ titre: 'Écart au tracé, validation (cm)', unite: ' cm', decimales: 1, meilleur: retenu, epochs: total,
+                series: classes.map(c => serie(c, l => l.ecart[c] == null ? null : 100 * l.ecart[c])) }),
+    graphique({ titre: 'IoU par classe, validation', unite: '', decimales: 2, meilleur: retenu, epochs: total,
+                series: classes.map(c => serie(c, l => l.iou[c])) }),
+  );
+  $('tableau').innerHTML = '<tr><th>Epoch</th><th>Perte</th><th>Distance</th><th>IoU moy.</th><th>Écart moy.</th>' +
+    classes.map(c => `<th>${NOMS[c]} (cm)</th>`).join('') + '<th>Durée</th></tr>' +
+    ep.slice().reverse().map(l => `<tr class="${l.epoch === retenu ? 'retenu' : ''}"><td>${l.epoch}${l.epoch === retenu ? ' ★' : ''}</td>
+      <td>${fmt(l.perte, 3)}</td><td>${fmt(l.distance, 3)}</td><td>${fmt(l.iou_moyen, 3)}</td><td>${fmt(100 * l.ecart_moyen)}</td>` +
+      classes.map(c => `<td>${l.ecart[c] == null ? '–' : fmt(100 * l.ecart[c])}</td>`).join('') + `<td>${l.duree} s</td></tr>`).join('');
+  $('journal').textContent = s.journal.join('\n');
+}
+async function liste() {
+  const l = await (await fetch('/api/entrainement/liste')).json();
+  if (!runAffiche) runAffiche = l.en_cours ?? l.runs[0]?.nom;
+  $('run').innerHTML = l.runs.map(r => `<option value="${r.nom}">${r.nom === '.' ? 'modeles/ (racine)' : r.nom}${r.en_cours ? ' (en cours)' : ''}</option>`).join('');
+  if (runAffiche) $('run').value = runAffiche;
+  if (enCours !== l.en_cours) { enCours = l.en_cours; apercu(); }   // apercu() gère l'état du bouton Lancer
+  $('arreter').disabled = !l.en_cours;
+  cafeine = l.cafeine;
+  $('cafeine').hidden = !l.cafeine_disponible;   // macOS seulement
+  $('cafeine').disabled = !l.en_cours && !l.cafeine;
+  $('cafeine').textContent = `☕ Anti-veille : ${l.cafeine ? 'activé' : 'désactivé'}`;
+  $('cafeine').classList.toggle('principal', l.cafeine);
+  $('statut').textContent = l.en_cours ?`Entraînement « ${l.en_cours} » en cours` : 'Aucun entraînement en cours';
+}
+$('run').onchange = () => { runAffiche = $('run').value; signature = ''; suivre(); };
+async function suivre() {
+  if (runAffiche) {
+    const r = await fetch('/api/entrainement/suivi?nom=' + encodeURIComponent(runAffiche));
+    if (r.ok) {
+      const s = await r.json();
+      const sig = s.lignes.length + '|' + s.en_cours + '|' + s.journal.at(-1);
+      if (sig !== signature) { signature = sig; afficher(s); }   // ne redessine que si quelque chose a changé
+    }
+  } else {
+    $('graphiques').innerHTML = '<div class="carte vide">Aucun entraînement suivi : lancez-en un.</div>';
+  }
+}
+options();
+liste().then(suivre);
+setInterval(() => liste().then(suivre), 3000);
+</script>
+</body>
+</html>

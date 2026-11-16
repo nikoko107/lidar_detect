@@ -1,0 +1,422 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Atelier tranchée 3D</title>
+<style>
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #14171c; color: #e6e8eb;
+               font: 13px/1.45 -apple-system, "Segoe UI", Roboto, sans-serif; }
+  body { display: grid; grid-template-rows: auto auto 1fr; }
+  [hidden] { display: none !important; }
+  #barre { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; padding: 8px 12px;
+           background: #1b1f26; border-bottom: 1px solid #2c333d; }
+  #barre h1 { font-size: 14px; margin: 0 8px 0 0; font-weight: 600; }
+  select, button { background: #2a313b; color: inherit; border: 1px solid #3a4350; border-radius: 5px;
+                   padding: 5px 9px; font: inherit; }
+  select { max-width: 320px; }
+  button { cursor: pointer; }
+  button:hover:not(:disabled) { background: #343d49; }
+  button:disabled { opacity: .5; cursor: default; }
+  button.principal { background: #2f6fde; border-color: #2f6fde; }
+  #statut { color: #8d97a5; margin-left: auto; }
+  #onglets { display: flex; overflow-x: auto; background: #181c22; border-bottom: 1px solid #2c333d; }
+  /* les onglets se partagent la largeur : libellé court, titre complet en infobulle et dans le panneau */
+  .onglet { flex: 1 1 auto; min-width: 0; padding: 6px 4px; cursor: pointer; border-bottom: 2px solid transparent;
+            display: flex; gap: 5px; align-items: center; justify-content: center; color: #aab3bf;
+            white-space: nowrap; font-size: 12px; }
+  .onglet .nom { overflow: hidden; text-overflow: ellipsis; }
+  #barre select { max-width: 26ch; }
+  .onglet .point { flex: none; }
+  .onglet.actif { color: #fff; border-bottom-color: #2f6fde; }
+  .onglet small { color: #6f7a88; font-size: 10px; }
+  @media (max-width: 1400px) { .onglet small { display: none; } }
+  .point { width: 8px; height: 8px; border-radius: 50%; background: #3a4350; }
+  .point.en_cours { background: #ffc93c; animation: battre 1s infinite; }
+  .point.ok { background: #3ddc97; }
+  .point.erreur { background: #ff4d5e; }
+  @keyframes battre { 50% { opacity: .3; } }
+  #scene { position: relative; overflow: hidden; }
+  #vue2d, #vue3d { position: absolute; inset: 0; }
+  #vue2d { cursor: grab; background: #0e1014; }
+  #vue2d.glisse { cursor: grabbing; }
+  #toile2d { position: absolute; left: 0; top: 0; transform-origin: 0 0; }
+  #toile2d img { position: absolute; left: 0; top: 0; image-rendering: pixelated; user-select: none;
+                 -webkit-user-drag: none; }
+  #panneau { position: absolute; top: 12px; right: 12px; width: 290px; max-height: calc(100% - 24px);
+             overflow: auto; background: rgba(24, 28, 34, .93); border: 1px solid #2c333d;
+             border-radius: 8px; padding: 12px 14px; box-sizing: border-box; }
+  #panneau h2 { font-size: 11px; margin: 12px 0 6px; color: #8d97a5; font-weight: 600;
+                text-transform: uppercase; letter-spacing: .05em; }
+  #panneau h2:first-child { margin-top: 0; }
+  #panneau label { display: flex; align-items: center; gap: 8px; padding: 2px 0; cursor: pointer; }
+  input[type=range] { width: 100%; }
+  .message { color: #c9d1db; }
+  .message.erreur { color: #ff8a95; white-space: pre-wrap; }
+  .note { color: #8d97a5; font-size: 11px; margin-top: 8px; }
+  .boutons { display: flex; gap: 6px; flex-wrap: wrap; }
+  .boutons button.actif { background: #2f6fde; border-color: #2f6fde; }
+  .vide { position: absolute; inset: 0; display: grid; place-items: center; color: #6f7a88; pointer-events: none; }
+  table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; font-size: 12px; }
+  td, th { padding: 2px 0; text-align: right; font-weight: 400; }
+  td:first-child, th:first-child { text-align: left; }
+  th { color: #8d97a5; }
+  .pastille { display: inline-block; width: 10px; height: 10px; border-radius: 2px; flex: none; }
+  pre { font-size: 11px; white-space: pre-wrap; margin: 0; color: #c9d1db; }
+</style>
+</head>
+<body>
+<div id="barre">
+  <h1>Atelier tranchée 3D</h1>
+  <a href="/entrainement" style="color:#aab3bf;text-decoration:none">Entraînement →</a>
+  <select id="nuage" title="Nuage"></select>
+  <button id="ouvrir">Charger un .laz…</button>
+  <input type="file" id="fichier" accept=".las,.laz" hidden>
+  <select id="modele" title="Modèle ONNX"></select>
+  <label title="0 = nuage entier ; 30 = ortho des seuls points à moins de 30 cm du fond de fouille (utiliser un modèle entraîné de même)">Fond de fouille
+    <input type="number" id="fond" min="0" max="200" step="5" value="0" style="width:4.5em"> cm</label>
+  <button id="lancer" class="principal">Lancer la détection</button>
+  <span id="statut"></span>
+</div>
+<div id="onglets"></div>
+<div id="scene">
+  <div id="vue2d" hidden><div id="toile2d"><img id="img-fond" alt=""><img id="img-dessus" alt=""></div></div>
+  <div id="vue3d" hidden></div>
+  <div class="vide" id="vide">Choisissez un nuage puis lancez la détection.</div>
+  <div id="panneau">
+    <h2 id="titre-etape"></h2>
+    <div class="message" id="message"></div>
+    <div id="controles"></div>
+    <div class="note" id="aide"></div>
+  </div>
+</div>
+<script src="/three_bundle.min.js"></script>
+<script>
+const { THREE, OrbitControls, Line2, LineMaterial, LineGeometry } = window.T3;
+const $ = id => document.getElementById(id);
+const COULEURS = { cable_noir: 0x37b6ff, fourreau_rouge: 0xff4d5e, boite_jonction: 0xffc93c, coffret: 0x3ddc97 };
+const EXISTANT = { bt_souterrain: [0xb57bff, 3, false], bt_aerien: [0x34e0e0, 3, false],
+                   poteau_ajoute: [0xa0703c, 6, false], raccord_probable: [0xff9a1f, 5, true] };   // couleur, largeur, tirets
+const NOMS = { cable_noir: 'Câble noir', fourreau_rouge: 'Fourreau rouge', boite_jonction: 'Boîte de jonction', coffret: 'Coffret' };
+const hex = c => '#' + c.toString(16).padStart(6, '0');
+const teinte = i => new THREE.Color().setHSL((i * 0.618034) % 1, 0.85, 0.58).getHex();   // couleurs distinctes
+
+// ---------------------------------------------------------------- définition des onglets
+// images : [fichier du dessus, libellé] ; le fond est toujours l'ortho
+// couches : couches 3D affichées, cochées par défaut ou non
+const ONGLETS = {
+  nuage:       { titre: '1. Nuage', court: 'Nuage', couches: { nuage: 1 },
+                 aide: 'Nuage brut, sous-échantillonné pour l’affichage.' },
+  ortho:       { titre: '2. Ortho', court: 'Ortho', images: [['ortho.png', 'Ortho RVB'], ['hauteur.png', 'Hauteur']],
+                 aide: 'Projection verticale : point le plus haut par pixel. Zones noires = pixels vides. Nuage entier : sert à détecter la tranchée.' },
+  tranchee:    { titre: '3. Tranchée', court: 'Tranchée', images: [['tranchee.png', 'Zone d’intérêt'], ['fond.png', 'Fond de tranchée'],
+                                                ['hauteur_relative.png', 'Hauteur / sol']],
+                 aide: 'Zone d’intérêt = tranchée + marge (le reste est assombri). Hauteur relative : −1,2 m (violet) à +0,3 m (jaune).' },
+  fond:        { titre: '4. Fond de fouille', court: 'Fond', couches: { fond_gardes: 1, fond_ecartes: 1 },
+                 aide: 'Variante « fond de fouille » (champ en haut, en cm ; 0 = désactivée) : seuls les points entre le fond de fouille (pris dans la tranchée détectée) et la hauteur choisie au-dessus servent à l’ortho et à la détection. En gris : points écartés (terrain autour, parois hautes, lèvres de terre, coffrets).' },
+  ortho_fond:  { titre: '5. Ortho fond', court: 'Ortho fond', surFond: 1,
+                 images: [['ortho_fond.png', 'Ortho fond de fouille'], ['hauteur_fond.png', 'Hauteur']],
+                 aide: 'Ortho refaite avec les seuls points gardés à l’étape 4 : c’est elle que voit le modèle. Noir = aucun point gardé. À 0 cm, identique à l’onglet 2.' },
+  detection:   { titre: '6. Détection 2D', surFond: 1, court: 'Détection', images: [['detection.png', 'Classes'], ['confiance.png', 'Confiance']],
+                 legende: true, aide: 'Sortie du U-Net (ONNX, CPU). Confiance : 0,3 (violet) à 1 (jaune).' },
+  nettoyage:   { titre: '7. Nuage nettoyé', court: 'Nettoyé', couches: { gris: 1, classes: 1, caches: 0 }, legende: true,
+                 aide: 'Points du nuage sous les masques, en surface seulement. « Cachés » : sous un masque mais sous la surface vue du dessus, donc écartés.' },
+  traces:      { titre: '8. Dessins auto', court: 'Dessins', couches: { gris: 1, traces: 1, ponctuels: 1 },
+                 aide: 'Tronçons bruts mesurés sur la ligne de crête, avant raccordement. Une couleur par tronçon : la fragmentation saute aux yeux.' },
+  reseaux:     { titre: '9. Séparation réseaux', court: 'Réseaux', couches: { gris: 1, reseaux: 1 },
+                 aide: 'Après raccordement : une couleur par câble (id_cable). Tirets = tronçons déduits.' },
+  sous_masque: { titre: '10. Sous masque', court: 'Masque', couches: { gris: 1, observes: 1, deduits: 1 },
+                 aide: 'Tronçons déduits (jaune, tirets) : interpolation entre deux extrémités, pas une mesure.' },
+  ouvrages:    { titre: '11. Raccord ouvrages', court: 'Ouvrages', couches: { gris: 1, observes: 1, deduits: 1, ponctuels: 1, ouvrages: 1 },
+                 aide: 'Bouts de câble prolongés jusqu’à la boîte ou au coffret le plus proche (distance_ouvrage_max), dans la continuité du fourreau : orange, tirets. Tronçon déduit, pas une mesure.' },
+  resultat:    { titre: '12. Résultat', court: 'Résultat', couches: { nuage: 1, resultat: 1, ponctuels: 1, verite: 1, existant: 1, raccord: 1 }, legende: true,
+                 aide: 'GeoJSON final. Vérité terrain en blanc si verite.geojson est à côté du nuage. Réseau BT existant (© Enedis, open data, Licence Ouverte 2.0 ; précis à 5-10 m) : souterrain violet, aérien cyan (8 m) ; raccord probable orange en tirets, poteau ajouté brun.' },
+};
+const LIBELLES = { nuage: 'Nuage RVB', gris: 'Nuage (gris)', classes: 'Points classés', caches: 'Points cachés écartés',
+                   traces: 'Tronçons bruts', ponctuels: 'Boîtes et coffrets', reseaux: 'Câbles raccordés',
+                   observes: 'Tronçons observés', deduits: 'Tronçons déduits', resultat: 'Résultat', verite: 'Vérité terrain', ouvrages: 'Prolongements vers ouvrages',
+                   existant: 'Réseau BT existant (open data)', raccord: 'Raccord probable',
+                   fond_gardes: 'Points gardés (près du fond)', fond_ecartes: 'Points écartés' };
+
+let etat = null, ongletActif = 'nuage', charge = {}, execution = -1;
+
+// ---------------------------------------------------------------- 3D
+THREE.Object3D.DEFAULT_UP.set(0, 0, 1);
+const rendu = new THREE.WebGLRenderer({ antialias: true });
+rendu.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+rendu.setClearColor(0x14171c);
+$('vue3d').appendChild(rendu.domElement);
+const scene3 = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(50, 1, 0.02, 2000);
+const controles = new OrbitControls(camera, rendu.domElement);
+controles.enableDamping = true;
+controles.dampingFactor = 0.12;
+const couches = {};
+for (const nom of Object.keys(LIBELLES)) { couches[nom] = new THREE.Group(); scene3.add(couches[nom]); }
+const matRvb = new THREE.PointsMaterial({ size: 2, sizeAttenuation: false, vertexColors: true });
+const matGris = new THREE.PointsMaterial({ size: 1.5, sizeAttenuation: false, color: 0x59606b, transparent: true, opacity: 0.5 });
+const matClasses = new THREE.PointsMaterial({ size: 3, sizeAttenuation: false, vertexColors: true });
+const matCaches = new THREE.PointsMaterial({ size: 3, sizeAttenuation: false, color: 0xb57bff });
+let materiauxLignes = [], cameraPlacee = false;
+
+function vider(groupe) {
+  for (const o of [...groupe.children]) { groupe.remove(o); o.geometry?.dispose(); }
+}
+async function chargerPoints(fichier) {
+  const tampon = await (await fetch('/fichiers/' + fichier)).arrayBuffer();
+  const n = tampon.byteLength / 15;
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.BufferAttribute(new Float32Array(tampon, 0, n * 3), 3));
+  g.setAttribute('color', new THREE.BufferAttribute(new Uint8Array(tampon, n * 12, n * 3), 3, true));
+  g.computeBoundingBox();
+  return g;
+}
+function tracer(pts, couleur, largeur, pointille, groupe) {
+  if (pts.length < 2) return;
+  const g = new LineGeometry();
+  g.setPositions(pts.flat());
+  const m = new LineMaterial({ color: couleur, linewidth: largeur, dashed: pointille, dashSize: 0.06, gapSize: 0.05,
+                               depthTest: false, transparent: true });
+  m.resolution.set($('vue3d').clientWidth, $('vue3d').clientHeight);
+  const l = new Line2(g, m);
+  l.computeLineDistances();
+  l.renderOrder = 10;
+  materiauxLignes.push(m);
+  groupe.add(l);
+}
+function boule(xyz, couleur, groupe, rayon = 0.045) {
+  const m = new THREE.Mesh(new THREE.SphereGeometry(rayon, 16, 12),
+                           new THREE.MeshBasicMaterial({ color: couleur, depthTest: false, transparent: true }));
+  m.position.set(...xyz);
+  m.renderOrder = 11;
+  groupe.add(m);
+}
+function vue(dessus) {
+  const g = couches.nuage.children[0]?.geometry;
+  if (!g) return;
+  const b = g.boundingBox, c = b.getCenter(new THREE.Vector3()), t = b.getSize(new THREE.Vector3());
+  const p = Math.max(t.x, t.y, 1);
+  controles.target.copy(c);
+  if (dessus) camera.position.set(c.x, c.y - 0.001, c.z + p * 1.1);
+  else camera.position.set(c.x - p * 0.45, c.y - p * 0.55, c.z + p * 0.4);
+  controles.update();
+}
+function redimensionner() {
+  const l = $('vue3d').clientWidth || $('scene').clientWidth, h = $('vue3d').clientHeight || $('scene').clientHeight;
+  rendu.setSize(l, h);
+  camera.aspect = l / h;
+  camera.updateProjectionMatrix();
+  for (const m of materiauxLignes) m.resolution.set(l, h);
+}
+window.addEventListener('resize', redimensionner);
+(function boucle() {
+  requestAnimationFrame(boucle);
+  if (!$('vue3d').hidden) { controles.update(); rendu.render(scene3, camera); }
+})();
+
+// chargement des données 3D d'une étape terminée
+const CHARGEURS = {
+  async nuage() {
+    vider(couches.nuage); vider(couches.gris);
+    const g = await chargerPoints('nuage.bin');
+    couches.nuage.add(new THREE.Points(g, matRvb));
+    couches.gris.add(new THREE.Points(g, matGris));
+    if (!cameraPlacee) { vue(false); cameraPlacee = true; }
+    vider(couches.verite);
+    const v = etat.infos.verite;
+    if (v) {
+      for (const l of v.lignes) tracer(l, 0xffffff, 1.5, false, couches.verite);
+      for (const p of v.points) boule(p, 0xffffff, couches.verite, 0.06);
+    }
+  },
+  async fond() {
+    vider(couches.fond_gardes); vider(couches.fond_ecartes);
+    couches.fond_gardes.add(new THREE.Points(await chargerPoints('fond_gardes.bin'), matRvb));
+    couches.fond_ecartes.add(new THREE.Points(await chargerPoints('fond_ecartes.bin'), matGris));
+  },
+  async nettoyage() {
+    vider(couches.classes); vider(couches.caches);
+    couches.classes.add(new THREE.Points(await chargerPoints('classes.bin'), matClasses));
+    couches.caches.add(new THREE.Points(await chargerPoints('caches.bin'), matCaches));
+  },
+  async traces() {
+    vider(couches.traces); vider(couches.ponctuels);
+    etat.infos.traces.forEach((t, i) => tracer(t.pts, teinte(i), 4, false, couches.traces));
+    for (const p of etat.infos.ponctuels) boule(p.xyz, COULEURS[p.classe], couches.ponctuels);
+  },
+  async reseaux() {
+    for (const n of ['reseaux', 'observes', 'deduits', 'resultat']) vider(couches[n]);
+    for (const t of etat.infos.raccordes) {
+      const ded = t.origine === 'deduit';
+      tracer(t.pts, teinte(t.id_cable), ded ? 3 : 4, ded, couches.reseaux);
+      if (ded) tracer(t.pts, 0xffd23c, 5, true, couches.deduits);
+      else tracer(t.pts, 0xdfe5ec, 2, false, couches.observes);
+      tracer(t.pts, COULEURS[t.classe] ?? 0xffffff, ded ? 3 : 4, ded, couches.resultat);
+    }
+  },
+  async ouvrages() {
+    vider(couches.ouvrages);
+    for (const t of etat.infos.ouvrages) {
+      tracer(t.pts, 0xff9a1f, 5, true, couches.ouvrages);
+      tracer(t.pts, COULEURS[t.classe] ?? 0xffffff, 3, true, couches.resultat);
+    }
+  },
+  async resultat() {
+    vider(couches.existant); vider(couches.raccord);
+    for (const [classe, lignes] of Object.entries(etat.infos.reseau_existant ?? {})) {
+      const [couleur, largeur, tirets] = EXISTANT[classe] ?? [0xffffff, 2, false];
+      for (const l of lignes) tracer(l, couleur, largeur, tirets, classe === 'raccord_probable' ? couches.raccord : couches.existant);
+    }
+  },
+};
+
+// ---------------------------------------------------------------- 2D (zoom molette, déplacement à la souris)
+const v2 = { e: 1, x: 0, y: 0 };
+function appliquer2d() { $('toile2d').style.transform = `translate(${v2.x}px,${v2.y}px) scale(${v2.e})`; }
+function ajuster2d() {
+  const img = $('img-fond'), boite = $('vue2d').getBoundingClientRect();
+  if (!img.naturalWidth) return;
+  v2.e = Math.min(boite.width / img.naturalWidth, boite.height / img.naturalHeight) * 0.95;
+  v2.x = (boite.width - img.naturalWidth * v2.e) / 2;
+  v2.y = (boite.height - img.naturalHeight * v2.e) / 2;
+  appliquer2d();
+}
+$('vue2d').addEventListener('wheel', ev => {
+  ev.preventDefault();
+  const b = $('vue2d').getBoundingClientRect(), mx = ev.clientX - b.left, my = ev.clientY - b.top;
+  const f = Math.exp(-ev.deltaY * 0.0015);
+  v2.x = mx - (mx - v2.x) * f; v2.y = my - (my - v2.y) * f; v2.e *= f;
+  appliquer2d();
+}, { passive: false });
+let glisse = null;
+$('vue2d').addEventListener('pointerdown', ev => {
+  glisse = [ev.clientX - v2.x, ev.clientY - v2.y];
+  $('vue2d').classList.add('glisse');
+  $('vue2d').setPointerCapture(ev.pointerId);
+});
+$('vue2d').addEventListener('pointermove', ev => {
+  if (glisse) { v2.x = ev.clientX - glisse[0]; v2.y = ev.clientY - glisse[1]; appliquer2d(); }
+});
+$('vue2d').addEventListener('pointerup', () => { glisse = null; $('vue2d').classList.remove('glisse'); });
+$('vue2d').addEventListener('dblclick', ajuster2d);
+$('img-fond').addEventListener('load', () => { if (!v2.place) { ajuster2d(); v2.place = true; } });
+
+// ---------------------------------------------------------------- panneau et onglets
+let imageChoisie = {};   // par onglet
+const NOMS_EXISTANT = { bt_souterrain: 'BT souterrain existant', bt_aerien: 'BT aérien existant',
+                        poteau_ajoute: 'Poteau ajouté', raccord_probable: 'Raccord probable' };
+function legende(nom) {
+  const cases = (noms, couleur) => Object.entries(noms).map(([k, n]) =>
+    `<label style="cursor:default"><span class="pastille" style="background:${hex(couleur(k))}"></span>${n}</label>`).join('');
+  return '<h2>Légende</h2>' + cases(NOMS, k => COULEURS[k]) + (nom === 'resultat' ? cases(NOMS_EXISTANT, k => EXISTANT[k][0]) : '');
+}
+function afficherOnglet(nom) {
+  ongletActif = nom;
+  const o = ONGLETS[nom], e = etat?.etapes?.[nom];
+  document.querySelectorAll('.onglet').forEach(d => d.classList.toggle('actif', d.dataset.nom === nom));
+  $('titre-etape').textContent = o.titre;
+  const msg = $('message');
+  msg.className = 'message' + (e?.statut === 'erreur' ? ' erreur' : '');
+  msg.textContent = !e ? '' : e.statut === 'sans_modele' ? 'Choisissez un modèle ONNX pour exécuter cette étape.'
+                   : e.statut === 'attente' ? 'En attente…' : e.statut === 'en_cours' ? 'En cours…'
+                   : (e.message || '') + (e.duree != null ? ` (${e.duree} s)` : '');
+  $('aide').textContent = o.aide;
+  const ctl = $('controles');
+  ctl.innerHTML = '';
+  const pret = e?.statut === 'ok';
+  $('vide').hidden = pret;
+  $('vue2d').hidden = !(pret && o.images);
+  $('vue3d').hidden = !(pret && o.couches);
+  if (!pret) return;
+
+  if (o.images) {
+    const choix = imageChoisie[nom] ?? o.images[0][0];
+    const boutons = o.images.map(([f, l]) => `<button data-img="${f}" class="${f === choix ? 'actif' : ''}">${l}</button>`).join('');
+    ctl.innerHTML = `<h2>Image</h2><div class="boutons">${boutons}</div>
+      <h2>Fondu sur l’ortho</h2><input type="range" id="fondu" min="0" max="1" step="0.05" value="1">
+      <div class="note">Molette : zoom · glisser : déplacer · double-clic : recadrer</div>` + (o.legende ? legende(nom) : '');
+    $('img-fond').src = `/fichiers/${o.surFond ? 'ortho_fond.png' : 'ortho.png'}?e=` + execution;   // l'ortho vue par le modèle
+    $('img-dessus').src = '/fichiers/' + choix + '?e=' + execution;
+    $('img-dessus').style.opacity = 1;
+    ctl.querySelectorAll('[data-img]').forEach(b => b.onclick = () => { imageChoisie[nom] = b.dataset.img; afficherOnglet(nom); });
+    $('fondu').oninput = ev => { $('img-dessus').style.opacity = ev.target.value; };
+  } else {
+    for (const n of Object.keys(couches)) couches[n].visible = !!o.couches[n];
+    const cases = Object.entries(o.couches).map(([n, actif]) =>
+      `<label><input type="checkbox" data-couche="${n}" ${actif ? 'checked' : ''}> ${LIBELLES[n]}</label>`).join('');
+    ctl.innerHTML = `<h2>Couches</h2>${cases}
+      <h2>Affichage</h2><label style="display:block">Taille des points
+      <input type="range" id="taille" min="1" max="6" step="0.5" value="${matRvb.size}"></label>
+      <div class="boutons"><button id="dessus">Vue de dessus</button><button id="v3d">Vue 3D</button></div>
+      <div class="note">Clic gauche : tourner · clic droit : déplacer · molette : zoom</div>` + (o.legende ? legende(nom) : '');
+    ctl.querySelectorAll('[data-couche]').forEach(c => c.onchange = () => { couches[c.dataset.couche].visible = c.checked; });
+    $('taille').oninput = ev => { matRvb.size = matClasses.size = +ev.target.value; matGris.size = matCaches.size = +ev.target.value * 0.75; };
+    $('dessus').onclick = () => vue(true);
+    $('v3d').onclick = () => vue(false);
+    redimensionner();
+    if (nom === 'resultat' && etat.infos.evaluation)
+      ctl.insertAdjacentHTML('beforeend', '<h2>Évaluation</h2><pre>' + JSON.stringify(etat.infos.evaluation, null, 1) + '</pre>');
+  }
+}
+function construireOnglets() {
+  $('onglets').innerHTML = Object.entries(ONGLETS).map(([n, o]) =>
+    `<div class="onglet" data-nom="${n}" title="${o.titre}"><span class="point" id="pt-${n}"></span><span class="nom">${o.titre.split('.')[0]}. ${o.court}</span><small id="du-${n}"></small></div>`).join('');
+  document.querySelectorAll('.onglet').forEach(d => d.onclick = () => afficherOnglet(d.dataset.nom));
+}
+
+// ---------------------------------------------------------------- serveur
+async function inventaire(selection) {
+  const l = await (await fetch('/api/liste')).json();
+  $('nuage').innerHTML = l.nuages.map(n => `<option value="${n.chemin}">${n.nom}${n.verite ? ' ✓ vérité' : ''}</option>`).join('');
+  if (selection) $('nuage').value = selection;
+  $('modele').innerHTML = '<option value="">(sans modèle : étapes 1 à 3)</option>' +
+    l.modeles.map(m => `<option value="${m}">${m}</option>`).join('');
+  if (l.modeles.length) $('modele').value = l.modeles[l.modeles.length - 1];
+}
+async function suivre() {
+  etat = await (await fetch('/api/etat')).json();
+  if (etat.execution !== execution) {
+    execution = etat.execution; charge = {}; cameraPlacee = false; v2.place = false; imageChoisie = {};
+    const enCours = [...$('nuage').options].find(o => o.text.startsWith(etat.dossier + '/'));
+    if (enCours) $('nuage').value = enCours.value;
+  }
+  for (const n of etat.ordre) {
+    const e = etat.etapes[n];
+    $('pt-' + n).className = 'point ' + (e?.statut ?? '');
+    $('du-' + n).textContent = e?.duree != null ? e.duree + ' s' : '';
+    if (e?.statut === 'ok' && !charge[n]) {
+      charge[n] = true;
+      const cle = n === 'sous_masque' ? null : n;
+      if (CHARGEURS[cle]) await CHARGEURS[cle]();
+      if (n === ongletActif) afficherOnglet(n);
+    }
+  }
+  const actif = etat.etapes[ongletActif];
+  if (actif && ['en_cours', 'attente', 'erreur'].includes(actif.statut)) afficherOnglet(ongletActif);
+  $('lancer').disabled = etat.en_cours;
+  $('statut').textContent = etat.en_cours ? 'Exécution en cours…' : etat.dossier ? `Fichiers : sortie/atelier/${etat.dossier}/` : '';
+  setTimeout(suivre, etat.en_cours ? 500 : 2000);
+}
+$('lancer').onclick = async () => {
+  const r = await fetch('/api/lancer', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ nuage: $('nuage').value, modele: $('modele').value, hauteur_fond: +$('fond').value / 100 }) });
+  if (!r.ok) { $('statut').textContent = (await r.json()).erreur; return; }
+  afficherOnglet('nuage');
+};
+$('ouvrir').onclick = () => $('fichier').click();
+$('fichier').onchange = async () => {
+  const f = $('fichier').files[0];
+  if (!f) return;
+  $('statut').textContent = `Envoi de ${f.name}…`;
+  const r = await fetch('/api/televerser', { method: 'POST', headers: { 'X-Nom': encodeURIComponent(f.name) }, body: f });
+  const d = await r.json();
+  $('statut').textContent = r.ok ? `${f.name} chargé.` : d.erreur;
+  if (r.ok) await inventaire(d.chemin);
+};
+
+construireOnglets();
+afficherOnglet('nuage');
+inventaire().then(suivre);
+</script>
+</body>
+</html>
