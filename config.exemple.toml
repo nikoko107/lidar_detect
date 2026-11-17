@@ -43,6 +43,7 @@ pixel_face = 0.005          # m
 face_portee = 1.5           # profondeur du volume regardé devant l'extrémité (m)
 face_demi_largeur = 0.75    # m, de part et d'autre de l'axe du câble
 face_hauteur = 1.5          # m au-dessus du sol
+face_sous_bout = 0.15       # m : la vue descend sous le bout du câble (entrée dans le coffret)
 
 # Réseau existant (open data Enedis) et raccord probable, étape « Résultat »
 reseau_existant = true

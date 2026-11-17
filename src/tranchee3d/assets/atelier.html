@@ -341,6 +341,9 @@ function afficherOnglet(nom) {
     $('dessus').onclick = () => vue(true);
     $('v3d').onclick = () => vue(false);
     redimensionner();
+    if (nom === 'ouvrages' && etat.infos.faces?.length)
+      ctl.insertAdjacentHTML('beforeend', '<h2>Vues de face aux extrémités</h2><div class="note">RVB à gauche, profondeur à droite (clair = proche). Clic : pleine taille.</div>' +
+        etat.infos.faces.map(f => `<a href="/fichiers/${f.image}?e=${execution}" target="_blank"><img src="/fichiers/${f.image}?e=${execution}" style="width:100%;margin-top:6px" title="${f.image} (${f.orientation === 'plan' ? 'face au plan vertical' : 'dans l’axe du câble'})"></a>`).join(''));
     if (nom === 'resultat' && etat.infos.evaluation)
       ctl.insertAdjacentHTML('beforeend', '<h2>Évaluation</h2><pre>' + JSON.stringify(etat.infos.evaluation, null, 1) + '</pre>');
   }

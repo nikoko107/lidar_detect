@@ -161,6 +161,7 @@ class Atelier:
         # imports ici : la chaîne (rasterio, onnxruntime, shapely…) n'est chargée qu'à la première exécution
         from .evaluation import evaluer
         from .export import ecrire_geojson, image_controle, vers_geojson
+        from .facade import ecrire_faces, orthos_aux_extremites
         from .inference import predire
         from .nuage import lire_nuage
         from .ortho import appliquer_ortho_fournie, generer_rasters
@@ -252,10 +253,17 @@ class Atelier:
             return f"{len(ded)} tronçon(s) déduit(s), {sum(t.longueur for t in ded):.2f} m"
 
         def f_ouvrages():
+            infos["faces"] = []
+            if cfg.faces_extremites:    # avant le prolongement : on regarde devant les bouts réellement vus
+                faces = orthos_aux_extremites(s["raccordes"], s["nuage"], s["r"], s["t"], cfg)
+                ecrire_faces(faces, dossier, s["nuage"], s["r"], cfg)   # à plat : le serveur ne sert pas les sous-dossiers
+                infos["faces"] = [{"image": f"face_{i:02d}.png", "orientation": f.orientation}
+                                  for i, f in enumerate(faces, 1)]
             avant = len(s["raccordes"])
             s["raccordes"] = rac = raccorder_ouvrages(s["raccordes"], s["ponctuels"], cfg)
             infos["ouvrages"] = _troncons(rac[avant:], s["centre"])
-            return f"{len(rac) - avant} prolongement(s) vers boîtes / coffrets, {sum(t.longueur for t in rac[avant:]):.2f} m"
+            return (f"{len(rac) - avant} prolongement(s) vers boîtes / coffrets, {sum(t.longueur for t in rac[avant:]):.2f} m ; "
+                    f"{len(infos['faces'])} ortho(s) de face")
 
         def f_resultat():
             n = s["nuage"]

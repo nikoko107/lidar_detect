@@ -98,9 +98,10 @@ def ortho_de_face(nuage: Nuage, bout: np.ndarray, direction: np.ndarray, z_sol: 
     p = nuage.xyz[proches]
     rel, h = p[:, :2] - bout[:2], p[:, 2] - z_sol
     avance = rel @ d
+    bas = min(cfg.face_z_min, bout[2] - z_sol - cfg.face_sous_bout)   # jusque sous le bout : entrée du câble dans l'ouvrage
     garde = ((avance >= -cfg.face_recul) & (avance <= cfg.face_portee) & (np.abs(rel @ lateral) <= cfg.face_demi_largeur)
-             & (h >= cfg.face_z_min) & (h <= cfg.face_hauteur))
-    if garde.sum() < cfg.face_points_min:
+             & (h >= bas) & (h <= cfg.face_hauteur))
+    if (garde & (h >= cfg.face_z_min)).sum() < cfg.face_points_min:
         return None
     p, rvb, h = p[garde], nuage.rvb[proches[garde]], h[garde]
 
@@ -116,9 +117,9 @@ def ortho_de_face(nuage: Nuage, bout: np.ndarray, direction: np.ndarray, z_sol: 
 
     px = cfg.pixel_face
     cu, prof = p[:, :2] @ u, p[:, :2] @ visee
-    u0, p0, z0 = cu.min(), prof.min(), z_sol + cfg.face_z_min
+    u0, p0, z0 = cu.min(), prof.min(), z_sol + bas
     W = int(np.ceil((cu.max() - u0) / px)) + 1
-    H = int(np.ceil((cfg.face_hauteur - cfg.face_z_min) / px)) + 1
+    H = int(np.ceil((cfg.face_hauteur - bas) / px)) + 1
     col = np.floor((cu - u0) / px).astype(np.int64).clip(0, W - 1)
     lig = (H - 1 - np.floor((p[:, 2] - z0) / px).astype(np.int64)).clip(0, H - 1)
     image = np.zeros((H, W, 3), np.uint8)

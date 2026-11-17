@@ -101,7 +101,8 @@ class Config:
     face_recul: float = 0.3             # le volume commence à cette distance derrière l'extrémité (m)
     face_demi_largeur: float = 0.75     # demi-largeur du volume, de part et d'autre de l'axe du câble (m)
     face_hauteur: float = 1.5           # haut du volume, au-dessus du sol (m)
-    face_z_min: float = 0.05            # bas du volume, au-dessus du sol : écarte le sol lui-même (m)
+    face_z_min: float = 0.05            # bas du volume au-dessus du sol, si le bout du câble n'est pas plus bas (m)
+    face_sous_bout: float = 0.15        # le volume descend jusqu'à cette distance sous le bout du câble (m)
     face_points_min: int = 200          # moins de points que ça dans le volume : pas d'image
     face_plan_z_min: float = 0.25       # recherche du plan vertical : points au-dessus de cette hauteur (m)
     face_plan_epaisseur: float = 0.03   # demi-épaisseur de la bande de points comptée comme un plan (m)

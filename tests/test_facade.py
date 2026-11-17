@@ -31,8 +31,8 @@ def test_ortho_tournee_face_au_coffret():
     # la face claire (200) apparaît comme un rectangle de 0,40 x 0,80 m
     clair = (f.rvb[..., 0] > 180) & np.isfinite(f.profondeur)
     lig, col = np.nonzero(clair)
-    assert abs((np.ptp(col) + 1) * f.pixel - 0.40) < 0.03
-    assert abs((np.ptp(lig) + 1) * f.pixel - (0.80 - cfg.face_z_min)) < 0.03
+    assert abs((np.ptp(col) + 1) * f.pixel - 0.40) < 0.03 + 2 * cfg.bouchage_px * f.pixel   # + bouchage des bords
+    assert abs((np.ptp(lig) + 1) * f.pixel - 0.80) < 0.03                         # le bout est plus bas : coffret entier
     # retour en 3D : les pixels de la face retombent sur le plan de la face, au centimètre
     xyz = f.px_vers_xyz(lig, col)
     ecart = (xyz[:, :2] - (np.array([2.0, 2.4]) - 0.1 * normale)) @ normale
