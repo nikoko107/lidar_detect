@@ -1,5 +1,6 @@
 """Gestion des entraînements depuis la page web : répartition des chantiers, lancement de
 `entrainer` dans un processus séparé, suivi par son historique.jsonl, anti-veille macOS.
+Gestion des processus par `psutil` : identique sous macOS, Linux et Windows (pas de `ps`, `pgrep`, `kill`).
 
 Le processus est indépendant du serveur : il survit à un redémarrage et est retrouvé par le fichier
 modeles/<nom>/processus.pid. Aucune dépendance HTTP ici (voir `serveur.py`).
@@ -10,7 +11,6 @@ import json
 import os
 import re
 import shutil
-import signal
 import subprocess
 import sys
 import time
@@ -18,6 +18,7 @@ from dataclasses import fields
 from pathlib import Path
 
 import numpy as np
+import psutil
 
 from .config import Config
 
@@ -41,8 +42,44 @@ def _entrainement_vivant(pid: int) -> bool:
     """Le pid existe et c'est bien un entraînement tranchee3d (un pid peut être réattribué)."""
     if pid <= 0:
         return False
-    commande = subprocess.run(["ps", "-p", str(pid), "-o", "command="], capture_output=True, text=True).stdout
+    try:
+        p = psutil.Process(pid)
+        if p.status() == psutil.STATUS_ZOMBIE:
+            return False
+        commande = " ".join(p.cmdline())
+    except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess):
+        return False
     return "tranchee3d" in commande and "entrainer" in commande
+
+
+def _arreter_pid(pid: int, delai: float = 10.0, popen: subprocess.Popen | None = None) -> None:
+    """Arrêt propre (SIGTERM sous Unix, TerminateProcess sous Windows) du processus et de ses enfants
+    (chargeurs de données torch), puis arrêt forcé de ceux qui n'ont pas fini après `delai` secondes.
+    Si le processus est notre propre fils (`popen`), c'est Popen qui l'attend, pour garder son code retour."""
+    try:
+        parent = psutil.Process(pid)
+        enfants = parent.children(recursive=True)
+    except psutil.NoSuchProcess:
+        return
+    for p in enfants + ([] if popen else [parent]):
+        try:
+            p.terminate()
+        except psutil.NoSuchProcess:
+            pass
+    if popen:
+        popen.terminate()
+    _, restants = psutil.wait_procs(enfants if popen else enfants + [parent], timeout=delai)
+    for p in restants:
+        try:
+            p.kill()
+        except psutil.NoSuchProcess:
+            pass
+    if popen:
+        try:
+            popen.wait(timeout=delai)
+        except subprocess.TimeoutExpired:
+            popen.kill()
+            popen.wait()
 
 
 def dossiers_de_donnees(racine: Path = Path(".")) -> dict[str, dict]:
@@ -55,10 +92,10 @@ def dossiers_de_donnees(racine: Path = Path(".")) -> dict[str, dict]:
     for motif in ("*/*/nuage", "*/*/*/nuage"):
         for r in {p.parent.parent for p in racine.glob(motif)}:
             if noms := [c.name for c in chantiers_bruts(r)]:
-                trouves[str(r.relative_to(racine)) if racine != Path(".") else str(r)] = {"type": "brut", "chantiers": noms}
+                trouves[r.relative_to(racine).as_posix() if racine != Path(".") else str(r)] = {"type": "brut", "chantiers": noms}
     for motif in ("*/*/chantier.npz", "*/*/*/chantier.npz"):
         for r in {p.parent.parent for p in racine.glob(motif)}:
-            cle = str(r.relative_to(racine)) if racine != Path(".") else str(r)
+            cle = r.relative_to(racine).as_posix() if racine != Path(".") else str(r)
             trouves.setdefault(cle, {"type": "prepare", "chantiers": sorted(p.parent.name for p in r.glob("*/chantier.npz"))})
     return dict(sorted(trouves.items(), key=lambda kv: (kv[1]["type"] != "brut", kv[0])))
 
@@ -85,9 +122,9 @@ class Entrainements:
         self.processus, self.pid, self.nom = None, None, None
         # un entraînement lancé avant un redémarrage du serveur continue : on le retrouve par son pid
         for f in modeles.glob("**/processus.pid"):
-            pid = int(f.read_text() or 0)
+            pid = int(f.read_text(encoding="utf-8").strip() or 0)
             if _entrainement_vivant(pid):
-                self.pid, self.nom = pid, str(f.parent.relative_to(modeles))
+                self.pid, self.nom = pid, f.parent.relative_to(modeles).as_posix()
 
     # ------------------------------------------------------------- état
     def en_cours(self) -> bool:
@@ -102,7 +139,7 @@ class Entrainements:
         dossiers = dossiers_de_donnees()
         return {"dossiers": [{"chemin": k, "type": v["type"], "chantiers": len(v["chantiers"])} for k, v in dossiers.items()],
                 "dossier_defaut": next(iter(dossiers), None),
-                "poids": [str(p) for p in sorted(self.modeles.glob("**/meilleur.pt"))],
+                "poids": [p.as_posix() for p in sorted(self.modeles.glob("**/meilleur.pt"))],
                 "parametres": [{"nom": n, "defaut": defauts[n], "choix": CHOIX.get(n)} for n in PARAMETRES_ENTRAINEMENT]}
 
     def repartition(self, dossier: str, pct_validation: float, pct_test: float, graine: int) -> dict:
@@ -162,21 +199,24 @@ class Entrainements:
             self.processus = subprocess.Popen(commande, stdout=journal, stderr=subprocess.STDOUT,
                                               env={**os.environ, "PYTHONUNBUFFERED": "1"})
         self.pid, self.nom = self.processus.pid, nom
-        (dossier / "processus.pid").write_text(str(self.pid))
+        (dossier / "processus.pid").write_text(str(self.pid), encoding="utf-8")
         return nom
 
     def arreter(self) -> None:
-        """SIGTERM au processus d'entraînement (meilleur.pt déjà écrit reste utilisable)."""
+        """Arrête le processus d'entraînement et ses enfants (meilleur.pt déjà écrit reste utilisable)."""
         if self.en_cours():
-            os.kill(self.pid, signal.SIGTERM)
+            _arreter_pid(self.pid, popen=self.processus)
 
     # ------------------------------------------------------------- anti-veille (macOS)
     def _pid_cafeine(self) -> int | None:
         """caffeinate attaché à l'entraînement en cours, même lancé avant un redémarrage du serveur."""
         if not cafeine_disponible() or not self.en_cours():
             return None
-        sortie = subprocess.run(["pgrep", "-f", f"caffeinate .*-w {self.pid}$"], capture_output=True, text=True).stdout
-        return int(sortie.split()[0]) if sortie.split() else None
+        for p in psutil.process_iter(["name", "cmdline"]):
+            commande = p.info["cmdline"] or []
+            if p.info["name"] == "caffeinate" and commande[-2:] == ["-w", str(self.pid)]:
+                return p.pid
+        return None
 
     def cafeine_active(self) -> bool:
         """Un caffeinate est-il attaché à l'entraînement en cours ?"""
@@ -186,7 +226,7 @@ class Entrainements:
         """Empêche la mise en veille tant que l'entraînement tourne (`caffeinate -w pid` s'arrête avec lui)."""
         if not actif:
             if pid := self._pid_cafeine():
-                os.kill(pid, signal.SIGTERM)
+                _arreter_pid(pid)
             return
         if not self.en_cours():
             raise ValueError("Aucun entraînement en cours.")
@@ -201,7 +241,7 @@ class Entrainements:
         dossiers = {p.parent for motif in ("**/historique.jsonl", "**/processus.pid") for p in self.modeles.glob(motif)}
         runs = []
         for d in sorted(dossiers, key=lambda d: d.stat().st_mtime, reverse=True):
-            nom = str(d.relative_to(self.modeles)) if d != self.modeles else "."
+            nom = d.relative_to(self.modeles).as_posix() if d != self.modeles else "."
             runs.append({"nom": nom, "en_cours": self.en_cours() and nom == self.nom})
         return runs
 

@@ -4,19 +4,31 @@ Détection 3D de câbles, boîtes de jonction et coffrets dans un nuage de point
 colorisé de tranchée ouverte. Détection en 2D sur une ortho, mesure en 3D sur
 le nuage. Inférence sur CPU.
 
-## Installation (Mac Apple Silicon)
+## Installation (macOS, Linux, Windows)
 
-Environnement virtuel Python, créé **hors du disque FAT** (qui gère mal les liens symboliques) :
+Python 3.11 ou plus récent. Environnement virtuel créé **hors du disque FAT** (qui gère mal les liens
+symboliques).
+
+macOS / Linux :
 
 ```bash
-uv venv ~/.venvs/tranchee3d --python 3.11          # ou : python3.11 -m venv ~/.venvs/tranchee3d
+python3 -m venv ~/.venvs/tranchee3d
 source ~/.venvs/tranchee3d/bin/activate
-uv pip install -e ".[dev]" pyproj                  # ou : pip install -e ".[dev]" pyproj
+python -m pip install -e ".[dev]" pyproj
 ```
 
-`pyproj` sert à `importer` (CRS des données Enedis). Torch sur Mac utilise MPS pour l'entraînement ;
-l'inférence reste sur CPU (ONNX Runtime). L'atelier se lance avec
-`python -m tranchee3d atelier` (http://127.0.0.1:8765).
+Windows (PowerShell) :
+
+```powershell
+python -m venv D:\lidar\.venv
+& "D:\lidar\.venv\Scripts\Activate.ps1"
+python -m pip install -e ".[dev]" pyproj
+```
+
+`pyproj` sert à `importer` (CRS des données Enedis). L'entraînement utilise MPS (Mac Apple Silicon)
+ou CUDA s'ils sont disponibles, sinon le CPU ; l'inférence reste toujours sur CPU (ONNX Runtime).
+L'atelier se lance avec `python -m tranchee3d atelier` (http://127.0.0.1:8765). L'anti-veille de la
+page d'entraînement (`caffeinate`) n'existe que sur macOS.
 
 Les données (`bruts/`, `donnees/`, `prepare*/`, `modeles/`, `sortie/`) ne sont pas versionnées
 (voir `.gitignore`).
