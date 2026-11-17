@@ -71,7 +71,13 @@ def cmd_predire(a, cfg):
     classes, confiance = predire(tenseur_entree(r, t), t.zone, a.modele, cfg)
     t2 = time.time()
     troncons, ponctuels = extraire(classes, confiance, r, nuage, cfg)
-    troncons = raccorder_ouvrages(raccorder(troncons, cfg), ponctuels, cfg)
+    troncons = raccorder(troncons, cfg)
+    faces = []
+    if cfg.faces_extremites:    # avant le prolongement aux ouvrages : on regarde devant les bouts réellement vus
+        from .facade import ecrire_faces, orthos_aux_extremites
+        faces = orthos_aux_extremites(troncons, nuage, r, t, cfg)
+        ecrire_faces(faces, sortie / "faces", nuage, r, cfg)
+    troncons = raccorder_ouvrages(troncons, ponctuels, cfg)
     t3 = time.time()
 
     fc = vers_geojson(troncons, ponctuels, nuage.origine, nuage.crs)
@@ -89,6 +95,8 @@ def cmd_predire(a, cfg):
     print(f"  câbles : {obs:.2f} m observés, {ded:.2f} m déduits ; ponctuels : {len(ponctuels)}")
     print(f"  temps : rasters {t1 - t0:.1f} s, inférence CPU {t2 - t1:.1f} s, 3D {t3 - t2:.1f} s")
     print(f"  -> {sortie}/resultat.geojson, visualiseur.html, controle_prediction.png")
+    if cfg.faces_extremites:
+        print(f"  -> {sortie}/faces/ : {len(faces)} ortho(s) de face aux extrémités de câble")
 
 
 def cmd_evaluer(a, cfg):

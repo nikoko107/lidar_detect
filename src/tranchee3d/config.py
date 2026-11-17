@@ -94,6 +94,23 @@ class Config:
     distance_ouvrage_max: float = 2.0  # bout de câble prolongé jusqu'à une boîte / un coffret à moins de ça, en plan (m)
     hauteur_entree_ouvrage: float = 0.40  # entrée du câble dans l'ouvrage, au-dessus de son point le plus bas (m, médiane du récolement)
 
+    # --- Orthos de face aux extrémités de câble (recherche des coffrets) ---
+    faces_extremites: bool = True       # False : pas d'ortho de face
+    pixel_face: float = 0.005           # taille de pixel de l'ortho de face (m)
+    face_portee: float = 1.5            # profondeur du volume découpé devant l'extrémité (m)
+    face_recul: float = 0.3             # le volume commence à cette distance derrière l'extrémité (m)
+    face_demi_largeur: float = 0.75     # demi-largeur du volume, de part et d'autre de l'axe du câble (m)
+    face_hauteur: float = 1.5           # haut du volume, au-dessus du sol (m)
+    face_z_min: float = 0.05            # bas du volume, au-dessus du sol : écarte le sol lui-même (m)
+    face_points_min: int = 200          # moins de points que ça dans le volume : pas d'image
+    face_plan_z_min: float = 0.25       # recherche du plan vertical : points au-dessus de cette hauteur (m)
+    face_plan_epaisseur: float = 0.03   # demi-épaisseur de la bande de points comptée comme un plan (m)
+    face_plan_pas_angle: float = 2.0    # pas du balayage des orientations (degrés)
+    face_plan_points_min: int = 500     # moins de points que ça dans le plan : vue dans l'axe du câble
+    face_plan_hauteur_min: float = 0.30  # étendue verticale minimale du plan (m)
+    face_plan_echantillon: int = 50000  # points tirés au plus pour chercher le plan
+    face_plage_gris: float = 0.30       # image de contrôle : plage de profondeur minimale couverte par le gris (m)
+
     # --- Réseau existant (open data Enedis, aide à la lecture, non évalué) ---
     reseau_existant: bool = True        # False : pas de téléchargement ni de raccord
     marge_reseau: float = 30.0          # rayon de recherche autour de l'emprise du nuage (m)

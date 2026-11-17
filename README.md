@@ -116,6 +116,7 @@ dessins auto, séparation réseaux, sous masque, raccord ouvrages, résultat + �
 | `inference.py` | inférence ONNX Runtime par tuiles |
 | `retour3d.py` | masques → polylignes 3D (ligne de crête) et ponctuels 3D |
 | `raccordement.py` | fusion des coupures, tronçons déduits sous masque, prolongement jusqu'aux boîtes et coffrets |
+| `facade.py` | orthos de face (RVB + profondeur) devant les extrémités libres des câbles, pour chercher les coffrets : `sortie/faces/` (`face_NN.png`, `face_NN.npz`, `faces.geojson`, `controle_faces.png`). Aucune détection pour l'instant |
 | `reseau_existant.py` | réseau BT open data Enedis autour du chantier, raccord probable (`reseau_existant.geojson`) |
 | `export.py` | GeoJSON 3D, images de contrôle |
 | `evaluation.py` | écarts à la vérité terrain |
