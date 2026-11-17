@@ -19,6 +19,7 @@ dependencies = [
     "segmentation-models-pytorch",
     "onnx",
     "onnxruntime",
+    "psutil",
 ]
 
 [project.optional-dependencies]

@@ -74,7 +74,7 @@ def _signature(chantier: Path, cfg: Config) -> dict:
     sources = [p for sous in ("nuage", "recolement", "ortho") for p in (chantier / sous).glob("*") if p.is_file()]
     sources.append(chantier / "project-metadata.json")
     return {"reglages": {k: getattr(cfg, k) for k in REGLAGES_PREPARATION},
-            "sources": {str(p.relative_to(chantier)): p.stat().st_mtime for p in sources if p.exists()}}
+            "sources": {p.relative_to(chantier).as_posix(): p.stat().st_mtime for p in sources if p.exists()}}
 
 
 def preparer_bruts(bruts, donnees, prepare, cfg: Config) -> list[str]:
@@ -87,7 +87,7 @@ def preparer_bruts(bruts, donnees, prepare, cfg: Config) -> list[str]:
         noms.append(n)
         cible, fiche = Path(prepare) / n, Path(prepare) / n / "preparation.json"
         signature = _signature(chantier, cfg)
-        if (cible / "chantier.npz").exists() and fiche.exists() and json.loads(fiche.read_text()) == signature:
+        if (cible / "chantier.npz").exists() and fiche.exists() and json.loads(fiche.read_text(encoding="utf-8")) == signature:
             print(f"Chantier {n} : déjà préparé")
             continue
         print(f"Chantier {n} : import et préparation")
